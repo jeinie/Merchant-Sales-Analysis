@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
 import { franchises } from '../data/mockData';
+import { api } from '../utils/api';
 
 const Login = ({ usersData, onLogin }) => {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
 
-    // Find user in usersData
-    const user = usersData.find(u => u.id === id && u.password === password);
-
-    if (user) {
-      // Don't store plain password in state/localStorage in real apps!
-      const userProfile = { ...user };
-      delete userProfile.password;
+    try {
+      const userProfile = await api.login(id, password);
       onLogin(userProfile);
-    } else {
-      setError('아이디 또는 비밀번호가 올바르지 않습니다.');
+    } catch (err) {
+      setError(err.message || '아이디 또는 비밀번호가 올바르지 않습니다.');
     }
   };
 
@@ -33,6 +30,11 @@ const Login = ({ usersData, onLogin }) => {
     
     return `${names.join(', ')} 담당`;
   };
+  const displayUsers = usersData && usersData.length > 0 ? usersData : [
+    { id: 'admin', name: '시스템 관리자', role: 'ADMIN' },
+    { id: 'sales_user', name: '김영업 사원', role: 'SALES', assignedFranchiseIds: ['F001', 'F002'] },
+    { id: 'sales_user2', name: '이영업 사원', role: 'SALES', assignedFranchiseIds: ['F003', 'F004'] }
+  ];
 
   return (
     <div style={{
@@ -107,7 +109,7 @@ const Login = ({ usersData, onLogin }) => {
 
         <div style={{ marginTop: '30px', backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', fontSize: '0.8rem', color: '#64748b', lineHeight: '1.8' }}>
           <strong>테스트 계정 안내 (비밀번호는 모두 1234)</strong><br />
-          {usersData.map(u => (
+          {displayUsers.map(u => (
             <div key={u.id} style={{ marginTop: '6px' }}>
               - {u.name}: <code>{u.id}</code> <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '4px' }}>({getFranchiseDescription(u)})</span>
             </div>
