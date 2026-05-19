@@ -22,7 +22,7 @@ ChartJS.register(
   Legend
 );
 
-const DetailsPanel = ({ franchise, onClose, averages }) => {
+const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
   if (!franchise) {
     return (
       <div className="details-panel" style={{ transform: 'translateX(100%)' }}>
@@ -133,7 +133,7 @@ const DetailsPanel = ({ franchise, onClose, averages }) => {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <h3 className="section-title" style={{ margin: 0 }}>✨ AI 컨설팅 리포트</h3>
-          {!aiInsight && (
+          {(!aiInsight && currentUser?.permissions?.canUseAI !== false) && (
             <button 
               onClick={handleGenerateInsight} 
               disabled={isGenerating}
@@ -163,6 +163,10 @@ const DetailsPanel = ({ franchise, onClose, averages }) => {
             </div>
           ) : aiInsight ? (
             <div>{aiInsight}</div>
+          ) : currentUser?.permissions?.canUseAI === false ? (
+            <div style={{ color: '#ef4444', textAlign: 'center', padding: '30px 10px', fontWeight: 'bold' }}>
+              ⚠️ AI 컨설팅 기능 사용 권한이 없습니다.<br/>관리자에게 문의해주세요.
+            </div>
           ) : (
             <div style={{ color: '#9ca3af', textAlign: 'center', padding: '30px 10px' }}>
               우측 상단의 버튼을 눌러<br/>매장 맞춤형 AI 비즈니스 인사이트를 생성해보세요.

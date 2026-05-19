@@ -98,3 +98,30 @@ export const regionAverages = {
     ]
   }
 };
+
+export const users = [
+  {
+    id: "admin",
+    password: "1234",
+    name: "시스템 관리자",
+    role: "ADMIN",
+    assignedFranchiseIds: null, // null means all access
+    permissions: { canUseAI: true }
+  },
+  {
+    id: "sales_user",
+    password: "1234",
+    name: "김영업 사원",
+    role: "SALES",
+    assignedFranchiseIds: ["F001", "F002"], // 강남역 1호점, 홍대입구점 담당
+    permissions: { canUseAI: true }
+  },
+  {
+    id: "sales_user2",
+    password: "1234",
+    name: "이영업 사원",
+    role: "SALES",
+    assignedFranchiseIds: ["F003", "F004"], // 여의도 금융타운점, 성수 카페거리점 담당
+    permissions: { canUseAI: true }
+  }
+];
