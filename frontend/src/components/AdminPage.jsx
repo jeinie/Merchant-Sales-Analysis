@@ -1,47 +1,30 @@
 import React from 'react';
-import { franchises } from '../data/mockData';
+import { api } from '../utils/api';
 
-const AdminPage = ({ usersData, setUsersData, onClose }) => {
+const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
 
-  const handleFranchiseChange = (franchiseId, e) => {
+  const handleFranchiseChange = async (franchiseId, e) => {
     const newUserId = e.target.value;
-    
-    // Create a new copy of usersData
-    const updatedUsers = usersData.map(user => {
-      if (user.role !== 'SALES') return user;
-      
-      let assigned = [...(user.assignedFranchiseIds || [])];
-      
-      // If this user is the newly selected one, add the franchise
-      if (user.id === newUserId) {
-        if (!assigned.includes(franchiseId)) {
-          assigned.push(franchiseId);
-        }
-      } else {
-        // If this user is NOT the selected one, remove the franchise from them
-        assigned = assigned.filter(id => id !== franchiseId);
-      }
-      
-      return { ...user, assignedFranchiseIds: assigned };
-    });
-
-    setUsersData(updatedUsers);
+    try {
+      await api.assignManager(franchiseId, newUserId);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(err.message || '담당자 할당에 실패했습니다.');
+    }
   };
 
-  const handlePermissionToggle = (userId, permissionKey) => {
-    const updatedUsers = usersData.map(user => {
-      if (user.id === userId) {
-        return {
-          ...user,
-          permissions: {
-            ...user.permissions,
-            [permissionKey]: !user.permissions[permissionKey]
-          }
-        };
-      }
-      return user;
-    });
-    setUsersData(updatedUsers);
+  const handlePermissionToggle = async (userId, permissionKey) => {
+    if (permissionKey !== 'canUseAI') return;
+    const user = usersData.find(u => u.id === userId);
+    if (!user) return;
+
+    const currentVal = !!user.permissions?.canUseAI;
+    try {
+      await api.toggleAi(userId, !currentVal);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(err.message || 'AI 권한 변경에 실패했습니다.');
+    }
   };
 
   const salesUsers = usersData.filter(u => u.role === 'SALES');
