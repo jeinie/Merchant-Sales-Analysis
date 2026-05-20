@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output and tool caches
+build/
+dist/
+.gradle/
+.vite/
+backend/build/
+backend/.gradle/
+frontend/dist/
+frontend/.vite/
+frontend/node_modules/.vite/
+
+# Local environment files
+.env
+*.env
+frontend/.env
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db

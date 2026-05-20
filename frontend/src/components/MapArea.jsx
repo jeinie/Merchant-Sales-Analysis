@@ -58,8 +58,6 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
           validMarkersCount++;
 
           // If all valid markers are processed, fit bounds
-          // Note: addressSearch is async, so we extend bounds as callbacks complete.
-          // In a production app, Promise.all would be better for bulk geocoding.
           mapInstance.current.setBounds(bounds);
         }
       });

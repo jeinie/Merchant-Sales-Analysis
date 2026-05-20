@@ -1,79 +1,82 @@
 package com.example.franchise.controller;
 
 import com.example.franchise.domain.Franchise;
-import com.example.franchise.domain.MonthlySales;
-import com.example.franchise.mapper.FranchiseMapper;
+import com.example.franchise.domain.User;
+import com.example.franchise.service.MockDataStore;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "http://localhost:5173") // Allow Vite frontend
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class FranchiseController {
 
-    private final FranchiseMapper franchiseMapper;
+    private final MockDataStore mockDataStore;
+
+    @GetMapping("/users")
+    public List<User> getUsers() {
+        return mockDataStore.getPublicUsers();
+    }
 
     @GetMapping("/franchises")
-    public List<Franchise> getFranchises() {
-        List<Franchise> franchises = franchiseMapper.findAllFranchises();
-        
-        for (Franchise f : franchises) {
-            List<MonthlySales> sales = franchiseMapper.findSalesByFranchiseId(f.getId());
-            f.setMonthlySales(sales);
-        }
-        
-        return franchises;
+    public List<Franchise> getFranchises(
+            @RequestParam(value = "userId", required = false) String userId,
+            @RequestParam(value = "role", required = false) String role) {
+        return mockDataStore.getFranchises(userId, role);
     }
 
     @GetMapping("/averages")
     public Map<String, Object> getAverages() {
-        Map<String, Object> response = new HashMap<>();
-        
-        // Process Industry Averages
-        List<Map<String, Object>> indList = franchiseMapper.getIndustryAverages();
-        Map<String, Map<String, Object>> industryAverages = new HashMap<>();
-        for (Map<String, Object> row : indList) {
-            String industry = (String) row.get("INDUSTRY");
-            String month = (String) row.get("MONTH");
-            Long avgSales = ((Number) row.get("AVG_SALES")).longValue();
-            
-            industryAverages.putIfAbsent(industry, new HashMap<>());
-            Map<String, Object> indObj = industryAverages.get(industry);
-            
-            List<Map<String, Object>> monthlySales = (List<Map<String, Object>>) indObj.computeIfAbsent("monthlySales", k -> new ArrayList<>());
-            Map<String, Object> saleNode = new HashMap<>();
-            saleNode.put("month", month);
-            saleNode.put("sales", avgSales);
-            monthlySales.add(saleNode);
+        return mockDataStore.getAverages();
+    }
+
+    @GetMapping("/admin/users")
+    public List<User> getAdminUsers() {
+        return mockDataStore.getSalesUsers();
+    }
+
+    @PostMapping("/admin/assign-manager")
+    public ResponseEntity<?> assignManager(@RequestBody Map<String, String> payload) {
+        String franchiseId = payload.get("franchiseId");
+        String managerId = payload.get("managerId");
+
+        if (franchiseId == null || franchiseId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "가맹점 ID가 필요합니다."));
         }
 
-        // Process Region Averages
-        List<Map<String, Object>> regList = franchiseMapper.getRegionAverages();
-        Map<String, Map<String, Object>> regionAverages = new HashMap<>();
-        for (Map<String, Object> row : regList) {
-            String region = (String) row.get("REGION");
-            String month = (String) row.get("MONTH");
-            Long avgSales = ((Number) row.get("AVG_SALES")).longValue();
-            
-            regionAverages.putIfAbsent(region, new HashMap<>());
-            Map<String, Object> regObj = regionAverages.get(region);
-            
-            List<Map<String, Object>> monthlySales = (List<Map<String, Object>>) regObj.computeIfAbsent("monthlySales", k -> new ArrayList<>());
-            Map<String, Object> saleNode = new HashMap<>();
-            saleNode.put("month", month);
-            saleNode.put("sales", avgSales);
-            monthlySales.add(saleNode);
+        try {
+            mockDataStore.assignManager(franchiseId, managerId);
+            return ResponseEntity.ok(Map.of("message", "담당 영업사원이 변경되었습니다."));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/toggle-ai")
+    public ResponseEntity<?> toggleAi(@RequestBody Map<String, Object> payload) {
+        String userId = (String) payload.get("userId");
+        Boolean canUseAI = (Boolean) payload.get("canUseAI");
+
+        if (userId == null || userId.isBlank() || canUseAI == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "필수 매개변수가 누락되었습니다."));
         }
 
-        response.put("industryAverages", industryAverages);
-        response.put("regionAverages", regionAverages);
-
-        return response;
+        try {
+            mockDataStore.toggleAi(userId, canUseAI);
+            return ResponseEntity.ok(Map.of("message", "AI 컨설팅 권한이 변경되었습니다."));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
     }
 }
