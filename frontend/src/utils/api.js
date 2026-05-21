@@ -1,154 +1,141 @@
-import {
-  users as defaultUsers,
-  franchises as defaultFranchises,
-  industryAverages,
-  regionAverages,
-} from '../data/mockData';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const TOKEN_STORAGE_KEY = 'authToken';
+const TOKEN_EXPIRES_AT_KEY = 'authTokenExpiresAt';
 
-const USERS_STORAGE_KEY = 'usersData';
+const getToken = () => localStorage.getItem(TOKEN_STORAGE_KEY);
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
-
-const normalizeUsers = (storedUsers) => {
-  const storedById = new Map((storedUsers || []).map((user) => [user.id, user]));
-
-  return defaultUsers.map((defaultUser) => {
-    const storedUser = storedById.get(defaultUser.id) || {};
-    return {
-      ...defaultUser,
-      ...storedUser,
-      id: defaultUser.id,
-      password: defaultUser.password,
-      name: defaultUser.name,
-      role: defaultUser.role,
-      assignedFranchiseIds: storedUser.assignedFranchiseIds ?? defaultUser.assignedFranchiseIds,
-      permissions: {
-        ...defaultUser.permissions,
-        ...storedUser.permissions,
-      },
-    };
-  });
+const saveAuth = ({ token, expiresAt }) => {
+  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+  localStorage.setItem(TOKEN_EXPIRES_AT_KEY, expiresAt);
 };
 
-const loadUsers = () => {
-  const saved = localStorage.getItem(USERS_STORAGE_KEY);
-  if (!saved) return clone(defaultUsers);
+const clearAuth = () => {
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  localStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
+};
 
+const parseErrorMessage = async (response) => {
   try {
-    return normalizeUsers(JSON.parse(saved));
+    const data = await response.json();
+    return data.message || '요청 처리 중 오류가 발생했습니다.';
   } catch (err) {
-    console.warn('저장된 mock 사용자 데이터를 읽지 못해 기본 데이터로 초기화합니다.');
-    return clone(defaultUsers);
+    return '요청 처리 중 오류가 발생했습니다.';
   }
 };
 
-let mockUsers = loadUsers();
-let mockFranchises = clone(defaultFranchises);
+const request = async (path, { method = 'GET', body, auth = true } = {}) => {
+  const headers = {};
 
-const persistUsers = () => {
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(mockUsers));
-};
+  if (body) {
+    headers['Content-Type'] = 'application/json';
+  }
 
-const toPublicUser = ({ password, ...user }) => clone(user);
-
-const syncSavedCurrentUser = (userId) => {
-  const currentRaw = localStorage.getItem('currentUser');
-  if (!currentRaw) return;
-
-  try {
-    const currentUser = JSON.parse(currentRaw);
-    if (currentUser.id !== userId) return;
-
-    const updated = mockUsers.find((user) => user.id === userId);
-    if (updated) {
-      localStorage.setItem('currentUser', JSON.stringify(toPublicUser(updated)));
+  if (auth) {
+    const token = getToken();
+    if (!token) {
+      const err = new Error('로그인이 필요합니다.');
+      err.status = 401;
+      throw err;
     }
-  } catch (err) {
-    localStorage.removeItem('currentUser');
+
+    headers.Authorization = `Bearer ${token}`;
   }
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    const networkError = new Error('백엔드 서버에 연결할 수 없습니다. Spring Boot 서버가 실행 중인지 확인해주세요.');
+    networkError.status = 0;
+    throw networkError;
+  }
+
+  if (!response.ok) {
+    const message = await parseErrorMessage(response);
+    const err = new Error(message);
+    err.status = response.status;
+
+    if (response.status === 401) {
+      clearAuth();
+      localStorage.removeItem('currentUser');
+    }
+
+    throw err;
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
 };
 
 export const api = {
-  async getUsers() {
-    return mockUsers.map(toPublicUser);
+  hasAuth() {
+    const token = getToken();
+    const expiresAt = localStorage.getItem(TOKEN_EXPIRES_AT_KEY);
+
+    if (!token || !expiresAt) return false;
+    if (new Date(expiresAt).getTime() <= Date.now()) {
+      clearAuth();
+      localStorage.removeItem('currentUser');
+      return false;
+    }
+
+    return true;
+  },
+
+  logout() {
+    clearAuth();
+    localStorage.removeItem('currentUser');
+  },
+
+  async getTestUsers() {
+    return request('/auth/test-users', { auth: false });
   },
 
   async login(id, password) {
-    const user = mockUsers.find((item) => item.id === id && item.password === password);
-    if (!user) {
-      throw new Error('아이디 또는 비밀번호가 올바르지 않습니다.');
-    }
+    const data = await request('/auth/login', {
+      method: 'POST',
+      body: { id, password },
+      auth: false,
+    });
 
-    return toPublicUser(user);
+    saveAuth(data);
+    return data.user;
   },
 
-  async getFranchises(userId, role) {
-    if (!userId || role === 'ADMIN') {
-      return clone(mockFranchises);
-    }
+  async getUsers() {
+    return request('/users');
+  },
 
-    const user = mockUsers.find((item) => item.id === userId);
-    const assignedIds = user?.assignedFranchiseIds || [];
-    return clone(mockFranchises.filter((franchise) => assignedIds.includes(franchise.id)));
+  async getFranchises() {
+    return request('/franchises');
   },
 
   async getAverages() {
-    return clone({ industryAverages, regionAverages });
+    return request('/averages');
   },
 
   async getAdminUsers() {
-    return mockUsers.filter((user) => user.role === 'SALES').map(toPublicUser);
+    return request('/admin/users');
   },
 
   async assignManager(franchiseId, managerId) {
-    const franchiseExists = mockFranchises.some((franchise) => franchise.id === franchiseId);
-    if (!franchiseExists) {
-      throw new Error('존재하지 않는 가맹점입니다.');
-    }
-
-    if (managerId && !mockUsers.some((user) => user.id === managerId && user.role === 'SALES')) {
-      throw new Error('존재하지 않는 영업사원입니다.');
-    }
-
-    mockUsers = mockUsers.map((user) => {
-      if (user.role !== 'SALES') return user;
-
-      let assignedFranchiseIds = user.assignedFranchiseIds
-        ? [...user.assignedFranchiseIds]
-        : [];
-
-      assignedFranchiseIds = assignedFranchiseIds.filter((id) => id !== franchiseId);
-      if (user.id === managerId) {
-        assignedFranchiseIds.push(franchiseId);
-      }
-
-      return { ...user, assignedFranchiseIds };
+    return request('/admin/assign-manager', {
+      method: 'POST',
+      body: { franchiseId, managerId },
     });
-
-    persistUsers();
-    mockUsers.forEach((user) => syncSavedCurrentUser(user.id));
-    return { success: true };
   },
 
   async toggleAi(userId, canUseAI) {
-    const userExists = mockUsers.some((user) => user.id === userId);
-    if (!userExists) {
-      throw new Error('존재하지 않는 사용자입니다.');
-    }
-
-    mockUsers = mockUsers.map((user) => {
-      if (user.id !== userId) return user;
-      return {
-        ...user,
-        permissions: {
-          ...user.permissions,
-          canUseAI,
-        },
-      };
+    return request('/admin/toggle-ai', {
+      method: 'POST',
+      body: { userId, canUseAI },
     });
-
-    persistUsers();
-    syncSavedCurrentUser(userId);
-    return { success: true };
   },
 };

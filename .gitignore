@@ -12,6 +12,7 @@ backend/.gradle/
 frontend/dist/
 frontend/.vite/
 frontend/node_modules/.vite/
+.run/
 
 # Local environment files
 .env

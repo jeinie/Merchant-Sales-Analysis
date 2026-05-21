@@ -25,11 +25,24 @@ function App() {
   const [selectedIndustry, setSelectedIndustry] = useState('전체');
   const [selectedFranchiseId, setSelectedFranchiseId] = useState(null);
 
-  // Load all required data from the local mock API.
+  const handleLogout = () => {
+    api.logout();
+    setCurrentUser(null);
+    setUsersData([]);
+    setSelectedFranchiseId(null);
+    setCurrentView('dashboard');
+    setFranchises([]);
+  };
+
+  // Load all required data from the authenticated backend API.
   const loadData = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !api.hasAuth()) {
+      handleLogout();
+      return;
+    }
+
     try {
-      const franchiseList = await api.getFranchises(currentUser.id, currentUser.role);
+      const franchiseList = await api.getFranchises();
       setFranchises(franchiseList);
 
       const averageData = await api.getAverages();
@@ -45,6 +58,9 @@ function App() {
       }
     } catch (err) {
       console.error('데이터 로드 실패:', err);
+      if (err.status === 401) {
+        handleLogout();
+      }
     }
   };
 
@@ -56,21 +72,13 @@ function App() {
   // Load public users for the login test account guide.
   useEffect(() => {
     if (!currentUser) {
-      api.getUsers().then(setUsersData).catch(console.error);
+      api.getTestUsers().then(setUsersData).catch(console.error);
     }
   }, [currentUser]);
 
   const handleLogin = (user) => {
     localStorage.setItem('currentUser', JSON.stringify(user));
     setCurrentUser(user);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    setCurrentUser(null);
-    setSelectedFranchiseId(null);
-    setCurrentView('dashboard');
-    setFranchises([]);
   };
 
   // Filter franchises in frontend for region & industry selections
