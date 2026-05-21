@@ -1,16 +1,17 @@
 package com.example.franchise.controller;
 
+import com.example.franchise.config.JwtAuthenticationFilter;
 import com.example.franchise.domain.Franchise;
 import com.example.franchise.domain.User;
 import com.example.franchise.service.MockDataStore;
-import lombok.RequiredArgsConstructor;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,21 +20,28 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
-@RequiredArgsConstructor
 public class FranchiseController {
 
     private final MockDataStore mockDataStore;
 
+    public FranchiseController(MockDataStore mockDataStore) {
+        this.mockDataStore = mockDataStore;
+    }
+
     @GetMapping("/users")
-    public List<User> getUsers() {
+    public List<User> getUsers(HttpServletRequest request) {
+        User user = currentUser(request);
+        if (!"ADMIN".equals(user.getRole())) {
+            return List.of(user);
+        }
+
         return mockDataStore.getPublicUsers();
     }
 
     @GetMapping("/franchises")
-    public List<Franchise> getFranchises(
-            @RequestParam(value = "userId", required = false) String userId,
-            @RequestParam(value = "role", required = false) String role) {
-        return mockDataStore.getFranchises(userId, role);
+    public List<Franchise> getFranchises(HttpServletRequest request) {
+        User user = currentUser(request);
+        return mockDataStore.getFranchises(user.getId(), user.getRole());
     }
 
     @GetMapping("/averages")
@@ -42,12 +50,20 @@ public class FranchiseController {
     }
 
     @GetMapping("/admin/users")
-    public List<User> getAdminUsers() {
-        return mockDataStore.getSalesUsers();
+    public ResponseEntity<?> getAdminUsers(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        return ResponseEntity.ok(mockDataStore.getSalesUsers());
     }
 
     @PostMapping("/admin/assign-manager")
-    public ResponseEntity<?> assignManager(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> assignManager(HttpServletRequest request, @RequestBody Map<String, String> payload) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
         String franchiseId = payload.get("franchiseId");
         String managerId = payload.get("managerId");
 
@@ -64,7 +80,11 @@ public class FranchiseController {
     }
 
     @PostMapping("/admin/toggle-ai")
-    public ResponseEntity<?> toggleAi(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> toggleAi(HttpServletRequest request, @RequestBody Map<String, Object> payload) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
         String userId = (String) payload.get("userId");
         Boolean canUseAI = (Boolean) payload.get("canUseAI");
 
@@ -78,5 +98,19 @@ public class FranchiseController {
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
+    }
+
+    private User currentUser(HttpServletRequest request) {
+        return (User) request.getAttribute(JwtAuthenticationFilter.CURRENT_USER_ATTRIBUTE);
+    }
+
+    private boolean isAdmin(HttpServletRequest request) {
+        User user = currentUser(request);
+        return user != null && "ADMIN".equals(user.getRole());
+    }
+
+    private ResponseEntity<?> forbidden() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "관리자 권한이 필요합니다."));
     }
 }

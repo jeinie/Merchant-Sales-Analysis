@@ -16,10 +16,12 @@ import java.util.stream.Collectors;
 @Service
 public class MockDataStore {
 
+    private final PasswordHasher passwordHasher;
     private final List<Franchise> franchises = new ArrayList<>();
     private final List<User> users = new ArrayList<>();
 
-    public MockDataStore() {
+    public MockDataStore(PasswordHasher passwordHasher) {
+        this.passwordHasher = passwordHasher;
         seedUsers();
         seedFranchises();
     }
@@ -39,7 +41,15 @@ public class MockDataStore {
 
     public synchronized User login(String id, String password) {
         return users.stream()
-                .filter(user -> user.getId().equals(id) && user.getPassword().equals(password))
+                .filter(user -> user.getId().equals(id) && passwordHasher.matches(password, user.getPasswordHash()))
+                .findFirst()
+                .map(this::publicUser)
+                .orElse(null);
+    }
+
+    public synchronized User findPublicUserById(String id) {
+        return users.stream()
+                .filter(user -> user.getId().equals(id))
                 .findFirst()
                 .map(this::publicUser)
                 .orElse(null);
@@ -180,7 +190,7 @@ public class MockDataStore {
             boolean canUseAI) {
         User user = new User();
         user.setId(id);
-        user.setPassword(password);
+        user.setPasswordHash(passwordHasher.hash(password));
         user.setName(name);
         user.setRole(role);
         user.setAssignedFranchiseIds(assignedFranchiseIds == null ? null : new ArrayList<>(assignedFranchiseIds));

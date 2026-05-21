@@ -1,10 +1,11 @@
 package com.example.franchise.controller;
 
 import com.example.franchise.domain.User;
+import com.example.franchise.service.JwtService;
 import com.example.franchise.service.MockDataStore;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,10 +17,20 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
-@RequiredArgsConstructor
 public class AuthController {
 
+    private final JwtService jwtService;
     private final MockDataStore mockDataStore;
+
+    public AuthController(JwtService jwtService, MockDataStore mockDataStore) {
+        this.jwtService = jwtService;
+        this.mockDataStore = mockDataStore;
+    }
+
+    @GetMapping("/test-users")
+    public ResponseEntity<?> getTestUsers() {
+        return ResponseEntity.ok(mockDataStore.getPublicUsers());
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
@@ -36,6 +47,10 @@ public class AuthController {
                     .body(Map.of("message", "아이디 또는 비밀번호가 올바르지 않습니다."));
         }
 
-        return ResponseEntity.ok(user);
+        JwtService.IssuedToken token = jwtService.issue(user);
+        return ResponseEntity.ok(Map.of(
+                "token", token.token(),
+                "expiresAt", token.expiresAt().toString(),
+                "user", user));
     }
 }
