@@ -72,6 +72,135 @@ body {
   height: 100%;
 }
 
+.map-message {
+  position: absolute;
+  inset: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #475569;
+  line-height: 1.6;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.map-legend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  min-width: 136px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: var(--shadow-md);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  backdrop-filter: blur(8px);
+}
+
+.map-legend-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.map-legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+.map-legend-dot.up {
+  background: #16a34a;
+}
+
+.map-legend-dot.flat {
+  background: #2563eb;
+}
+
+.map-legend-dot.down {
+  background: #dc2626;
+}
+
+.map-legend-scale {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.map-summary-pill {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 3;
+  background: rgba(15, 23, 42, 0.82);
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+}
+
+.map-info-window {
+  min-width: 220px;
+  padding: 12px;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.map-info-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.map-info-meta,
+.map-info-address {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.map-info-sales {
+  margin-top: 10px;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.map-info-growth {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.map-info-growth.up {
+  color: #16a34a;
+}
+
+.map-info-growth.flat {
+  color: #2563eb;
+}
+
+.map-info-growth.down {
+  color: #dc2626;
+}
+
+.map-info-address {
+  margin-top: 8px;
+}
+
 .details-panel {
   width: 400px;
   background-color: var(--panel-bg);

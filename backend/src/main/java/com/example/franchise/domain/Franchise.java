@@ -8,6 +8,8 @@ public class Franchise {
     private String industry;
     private String region;
     private String address;
+    private Double latitude;
+    private Double longitude;
     
     // For nesting the monthly sales data
     private List<MonthlySales> monthlySales;
@@ -50,6 +52,22 @@ public class Franchise {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 
     public List<MonthlySales> getMonthlySales() {

@@ -127,8 +127,8 @@ public class MockDataStore {
 
     private void seedUsers() {
         users.add(user("admin", "1234", "시스템 관리자", "ADMIN", null, true));
-        users.add(user("sales_user", "1234", "김영업 사원", "SALES", List.of("F001", "F002"), true));
-        users.add(user("sales_user2", "1234", "이영업 사원", "SALES", List.of("F003", "F004"), true));
+        users.add(user("sales_user", "1234", "김영업 사원", "SALES", List.of("F001", "F002", "F003", "F004", "F005"), true));
+        users.add(user("sales_user2", "1234", "이영업 사원", "SALES", List.of("F006", "F007", "F008", "F009", "F010"), true));
     }
 
     private void seedFranchises() {
@@ -138,6 +138,8 @@ public class MockDataStore {
                 "카페",
                 "서울 강남구",
                 "서울 강남구 강남대로 396",
+                37.4979,
+                127.0276,
                 List.of(
                         sale(1L, "F001", "2023-01", 15000000L, 1500, 10000),
                         sale(2L, "F001", "2023-02", 16500000L, 1600, 10312),
@@ -150,6 +152,8 @@ public class MockDataStore {
                 "음식점",
                 "서울 마포구",
                 "서울 마포구 양화로 160",
+                37.5572,
+                126.9245,
                 List.of(
                         sale(4L, "F002", "2023-01", 25000000L, 800, 31250),
                         sale(5L, "F002", "2023-02", 23000000L, 750, 30666),
@@ -162,6 +166,8 @@ public class MockDataStore {
                 "카페",
                 "서울 영등포구",
                 "서울 영등포구 여의대로 108",
+                37.5259,
+                126.9286,
                 List.of(
                         sale(7L, "F003", "2023-01", 22000000L, 3000, 7333),
                         sale(8L, "F003", "2023-02", 20000000L, 2800, 7142),
@@ -174,10 +180,96 @@ public class MockDataStore {
                 "카페",
                 "서울 성동구",
                 "서울 성동구 연무장길 14",
+                37.5438,
+                127.0565,
                 List.of(
                         sale(10L, "F004", "2023-01", 18000000L, 1200, 15000),
                         sale(11L, "F004", "2023-02", 20000000L, 1300, 15384),
-                        sale(12L, "F004", "2023-03", 21000000L, 1400, 15000)
+                        sale(12L, "F004", "2023-03", 20400000L, 1320, 15454)
+                )));
+
+        franchises.add(franchise(
+                "F005",
+                "테헤란 점심특화점",
+                "음식점",
+                "서울 강남구",
+                "서울 강남구 테헤란로 152",
+                37.5013,
+                127.0396,
+                List.of(
+                        sale(13L, "F005", "2023-01", 17000000L, 850, 20000),
+                        sale(14L, "F005", "2023-02", 19000000L, 930, 20430),
+                        sale(15L, "F005", "2023-03", 16000000L, 780, 20512)
+                )));
+
+        franchises.add(franchise(
+                "F006",
+                "합정 브런치점",
+                "음식점",
+                "서울 마포구",
+                "서울 마포구 독막로 10",
+                37.5496,
+                126.9139,
+                List.of(
+                        sale(16L, "F006", "2023-01", 26000000L, 1040, 25000),
+                        sale(17L, "F006", "2023-02", 26500000L, 1060, 25000),
+                        sale(18L, "F006", "2023-03", 27000000L, 1080, 25000)
+                )));
+
+        franchises.add(franchise(
+                "F007",
+                "샛강 테이크아웃점",
+                "카페",
+                "서울 영등포구",
+                "서울 영등포구 의사당대로 83",
+                37.5184,
+                126.9317,
+                List.of(
+                        sale(19L, "F007", "2023-01", 19000000L, 2600, 7307),
+                        sale(20L, "F007", "2023-02", 18000000L, 2500, 7200),
+                        sale(21L, "F007", "2023-03", 15000000L, 2100, 7142)
+                )));
+
+        franchises.add(franchise(
+                "F008",
+                "성수 로스터리점",
+                "카페",
+                "서울 성동구",
+                "서울 성동구 성수이로 87",
+                37.5446,
+                127.0557,
+                List.of(
+                        sale(22L, "F008", "2023-01", 14000000L, 950, 14736),
+                        sale(23L, "F008", "2023-02", 15500000L, 1050, 14761),
+                        sale(24L, "F008", "2023-03", 19000000L, 1250, 15200)
+                )));
+
+        franchises.add(franchise(
+                "F009",
+                "상암 오피스푸드점",
+                "음식점",
+                "서울 마포구",
+                "서울 마포구 월드컵북로 396",
+                37.5796,
+                126.8896,
+                List.of(
+                        sale(25L, "F009", "2023-01", 30000000L, 1200, 25000),
+                        sale(26L, "F009", "2023-02", 30600000L, 1220, 25081),
+                        sale(27L, "F009", "2023-03", 31200000L, 1240, 25161)
+                )));
+
+        franchises.add(franchise(
+                "F010",
+                "선릉 라운지카페",
+                "카페",
+                "서울 강남구",
+                "서울 강남구 선릉로 428",
+                37.5045,
+                127.0490,
+                List.of(
+                        sale(28L, "F010", "2023-01", 28000000L, 1900, 14736),
+                        sale(29L, "F010", "2023-02", 27000000L, 1850, 14594),
+                        sale(30L, "F010", "2023-03", 22000000L, 1500, 14666)
                 )));
     }
 
@@ -204,6 +296,8 @@ public class MockDataStore {
             String industry,
             String region,
             String address,
+            Double latitude,
+            Double longitude,
             List<MonthlySales> monthlySales) {
         Franchise franchise = new Franchise();
         franchise.setId(id);
@@ -211,6 +305,8 @@ public class MockDataStore {
         franchise.setIndustry(industry);
         franchise.setRegion(region);
         franchise.setAddress(address);
+        franchise.setLatitude(latitude);
+        franchise.setLongitude(longitude);
         franchise.setMonthlySales(new ArrayList<>(monthlySales));
         return franchise;
     }
@@ -251,6 +347,8 @@ public class MockDataStore {
         copy.setIndustry(franchise.getIndustry());
         copy.setRegion(franchise.getRegion());
         copy.setAddress(franchise.getAddress());
+        copy.setLatitude(franchise.getLatitude());
+        copy.setLongitude(franchise.getLongitude());
         copy.setMonthlySales(franchise.getMonthlySales().stream()
                 .map(this::copySale)
                 .collect(Collectors.toList()));
