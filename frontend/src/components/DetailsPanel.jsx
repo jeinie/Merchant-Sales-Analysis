@@ -104,7 +104,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     }
   };
 
-  // Generate mock AI insight based on data
+  // Summarize the latest sales movement for the operations insight panel.
   const latestSales = salesData[salesData.length - 1];
   const prevSales = salesData[salesData.length - 2];
   const isUp = latestSales > prevSales;
@@ -132,7 +132,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h3 className="section-title" style={{ margin: 0 }}>✨ AI 컨설팅 리포트</h3>
+          <h3 className="section-title" style={{ margin: 0 }}>✨ AI 운영 인사이트</h3>
           {(!aiInsight && currentUser?.permissions?.canUseAI !== false) && (
             <button 
               onClick={handleGenerateInsight} 
@@ -165,11 +165,11 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
             <div>{aiInsight}</div>
           ) : currentUser?.permissions?.canUseAI === false ? (
             <div style={{ color: '#ef4444', textAlign: 'center', padding: '30px 10px', fontWeight: 'bold' }}>
-              ⚠️ AI 컨설팅 기능 사용 권한이 없습니다.<br/>관리자에게 문의해주세요.
+              ⚠️ AI 운영 인사이트 기능 사용 권한이 없습니다.<br/>관리자에게 문의해주세요.
             </div>
           ) : (
             <div style={{ color: '#9ca3af', textAlign: 'center', padding: '30px 10px' }}>
-              우측 상단의 버튼을 눌러<br/>매장 맞춤형 AI 비즈니스 인사이트를 생성해보세요.
+              우측 상단의 버튼을 눌러<br/>본사/영업 담당자용 운영 인사이트를 생성해보세요.
             </div>
           )}
         </div>
