@@ -3,7 +3,7 @@ package com.example.franchise.controller;
 import com.example.franchise.config.JwtAuthenticationFilter;
 import com.example.franchise.domain.Franchise;
 import com.example.franchise.domain.User;
-import com.example.franchise.service.FranchiseDataStore;
+import com.example.franchise.service.MockDataStore;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,10 +22,10 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class FranchiseController {
 
-    private final FranchiseDataStore dataStore;
+    private final MockDataStore mockDataStore;
 
-    public FranchiseController(FranchiseDataStore dataStore) {
-        this.dataStore = dataStore;
+    public FranchiseController(MockDataStore mockDataStore) {
+        this.mockDataStore = mockDataStore;
     }
 
     @GetMapping("/users")
@@ -35,18 +35,18 @@ public class FranchiseController {
             return List.of(user);
         }
 
-        return dataStore.getPublicUsers();
+        return mockDataStore.getPublicUsers();
     }
 
     @GetMapping("/franchises")
     public List<Franchise> getFranchises(HttpServletRequest request) {
         User user = currentUser(request);
-        return dataStore.getFranchises(user.getId(), user.getRole());
+        return mockDataStore.getFranchises(user.getId(), user.getRole());
     }
 
     @GetMapping("/averages")
     public Map<String, Object> getAverages() {
-        return dataStore.getAverages();
+        return mockDataStore.getAverages();
     }
 
     @GetMapping("/admin/users")
@@ -55,7 +55,7 @@ public class FranchiseController {
             return forbidden();
         }
 
-        return ResponseEntity.ok(dataStore.getSalesUsers());
+        return ResponseEntity.ok(mockDataStore.getSalesUsers());
     }
 
     @PostMapping("/admin/assign-manager")
@@ -72,7 +72,7 @@ public class FranchiseController {
         }
 
         try {
-            dataStore.assignManager(franchiseId, managerId);
+            mockDataStore.assignManager(franchiseId, managerId);
             return ResponseEntity.ok(Map.of("message", "담당 영업사원이 변경되었습니다."));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
@@ -93,7 +93,7 @@ public class FranchiseController {
         }
 
         try {
-            dataStore.toggleAi(userId, canUseAI);
+            mockDataStore.toggleAi(userId, canUseAI);
             return ResponseEntity.ok(Map.of("message", "AI 컨설팅 권한이 변경되었습니다."));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));

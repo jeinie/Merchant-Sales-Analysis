@@ -1,0 +1,7 @@
+server:
+  port: 8080
+
+app:
+  auth:
+    jwt-secret: ${FRANCHISE_JWT_SECRET:dev-only-change-this-secret-before-production}
+    jwt-expiration-minutes: 960
