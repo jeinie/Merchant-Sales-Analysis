@@ -1,6 +1,6 @@
 # Merchant Sales Analysis Platform
 
-지도 기반으로 프랜차이즈 가맹점의 매출 현황을 시각화하고, 전월 대비 성장률·거래 건수·객단가·업종/지역 평균 비교를 통해 본사 관리자와 영업 담당자의 의사결정을 지원하는 매출 분석 플랫폼입니다.
+지도 기반으로 가맹점/매장의 매출 현황을 시각화하고, 전월 대비 성장률·거래 건수·객단가·업종/지역 평균 비교를 통해 본사 관리자와 영업 담당자의 의사결정을 지원하는 매출 분석 플랫폼입니다.
 
 여러 가맹점의 상승/보합/하락 상태를 지도에서 모니터링하고, Gemini API 기반 AI 운영 인사이트를 통해 우선 확인이 필요한 매장과 핵심 지표를 파악할 수 있도록 설계했습니다.
 
@@ -20,7 +20,7 @@
 
 ## 서비스 대상
 
-이 프로젝트는 개별 가맹점 점주가 아니라 프랜차이즈 본사 관리자, 영업 담당자, 내부 의사결정자를 주요 사용자로 가정합니다.
+이 프로젝트는 개별 매장 점주가 아니라 브랜드 본사 관리자, 영업 담당자, 내부 의사결정자를 주요 사용자로 가정합니다.
 
 목표는 여러 가맹점 중 어떤 매장을 우선적으로 확인해야 하는지, 매출 변화의 원인 후보가 무엇인지, 어떤 지표를 지속적으로 모니터링해야 하는지 판단할 수 있도록 돕는 것입니다.
 
@@ -137,8 +137,8 @@ cd backend
 SPRING_PROFILES_ACTIVE=gcp \
 DB_HOST=127.0.0.1 \
 DB_PORT=3306 \
-DB_NAME=franchise_sales \
-DB_USERNAME=franchise_app \
+DB_NAME=merchant_sales \
+DB_USERNAME=merchant_app \
 DB_PASSWORD=your-db-password \
 FRANCHISE_JWT_SECRET=your-secret-key \
 gradle bootRun --no-problems-report
@@ -150,8 +150,8 @@ Windows PowerShell에서는 아래처럼 설정할 수 있습니다.
 $env:SPRING_PROFILES_ACTIVE="gcp"
 $env:DB_HOST="127.0.0.1"
 $env:DB_PORT="3306"
-$env:DB_NAME="franchise_sales"
-$env:DB_USERNAME="franchise_app"
+$env:DB_NAME="merchant_sales"
+$env:DB_USERNAME="merchant_app"
 $env:DB_PASSWORD="your-db-password"
 $env:FRANCHISE_JWT_SECRET="your-secret-key"
 gradle bootRun --no-problems-report
