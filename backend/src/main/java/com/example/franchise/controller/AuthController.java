@@ -1,8 +1,8 @@
 package com.example.franchise.controller;
 
 import com.example.franchise.domain.User;
+import com.example.franchise.service.FranchiseDataStore;
 import com.example.franchise.service.JwtService;
-import com.example.franchise.service.MockDataStore;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,16 +20,16 @@ import java.util.Map;
 public class AuthController {
 
     private final JwtService jwtService;
-    private final MockDataStore mockDataStore;
+    private final FranchiseDataStore dataStore;
 
-    public AuthController(JwtService jwtService, MockDataStore mockDataStore) {
+    public AuthController(JwtService jwtService, FranchiseDataStore dataStore) {
         this.jwtService = jwtService;
-        this.mockDataStore = mockDataStore;
+        this.dataStore = dataStore;
     }
 
     @GetMapping("/test-users")
     public ResponseEntity<?> getTestUsers() {
-        return ResponseEntity.ok(mockDataStore.getPublicUsers());
+        return ResponseEntity.ok(dataStore.getPublicUsers());
     }
 
     @PostMapping("/login")
@@ -41,7 +41,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "아이디와 비밀번호를 입력해주세요."));
         }
 
-        User user = mockDataStore.login(id, password);
+        User user = dataStore.login(id, password);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "아이디 또는 비밀번호가 올바르지 않습니다."));

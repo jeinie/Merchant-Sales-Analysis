@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { franchises } from '../data/mockData';
 import { api } from '../utils/api';
 
 const Login = ({ usersData, onLogin }) => {
@@ -22,19 +21,10 @@ const Login = ({ usersData, onLogin }) => {
   const getFranchiseDescription = (user) => {
     if (user.role === 'ADMIN') return '전체 가맹점 접근 가능';
     if (!user.assignedFranchiseIds || user.assignedFranchiseIds.length === 0) return '담당 가맹점 없음';
-    
-    const names = user.assignedFranchiseIds.map(id => {
-      const f = franchises.find(item => item.id === id);
-      return f ? f.region : '';
-    }).filter(Boolean);
-    
-    return `${names.join(', ')} 담당`;
+
+    return `${user.assignedFranchiseIds.length}개 가맹점 담당`;
   };
-  const displayUsers = usersData && usersData.length > 0 ? usersData : [
-    { id: 'admin', name: '시스템 관리자', role: 'ADMIN' },
-    { id: 'sales_user', name: '김영업 사원', role: 'SALES', assignedFranchiseIds: ['F001', 'F002'] },
-    { id: 'sales_user2', name: '이영업 사원', role: 'SALES', assignedFranchiseIds: ['F003', 'F004'] }
-  ];
+  const displayUsers = usersData || [];
 
   return (
     <div style={{
@@ -109,11 +99,15 @@ const Login = ({ usersData, onLogin }) => {
 
         <div style={{ marginTop: '30px', backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', fontSize: '0.8rem', color: '#64748b', lineHeight: '1.8' }}>
           <strong>테스트 계정 안내 (비밀번호는 모두 1234)</strong><br />
-          {displayUsers.map(u => (
-            <div key={u.id} style={{ marginTop: '6px' }}>
-              - {u.name}: <code>{u.id}</code> <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '4px' }}>({getFranchiseDescription(u)})</span>
-            </div>
-          ))}
+          {displayUsers.length > 0 ? (
+            displayUsers.map(u => (
+              <div key={u.id} style={{ marginTop: '6px' }}>
+                - {u.name}: <code>{u.id}</code> <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '4px' }}>({getFranchiseDescription(u)})</span>
+              </div>
+            ))
+          ) : (
+            <div style={{ marginTop: '6px' }}>계정 정보를 불러오는 중입니다.</div>
+          )}
         </div>
       </div>
     </div>

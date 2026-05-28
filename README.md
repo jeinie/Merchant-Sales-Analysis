@@ -132,11 +132,23 @@ FRANCHISE_JWT_SECRET=your-secret-key
 
 기본 실행은 기존처럼 in-memory mock data를 사용합니다. GCP Cloud SQL에 연결하려면 `gcp` 프로필과 DB 환경변수를 함께 설정합니다.
 
+`application-gcp.yml`은 로컬 DB 연결 정보를 담을 수 있으므로 Git에 포함하지 않습니다. 처음 설정할 때는 예시 파일을 복사해 로컬 설정 파일을 만듭니다.
+
+```bash
+cp backend/src/main/resources/application-gcp.example.yml backend/src/main/resources/application-gcp.yml
+```
+
+Windows PowerShell에서는 아래처럼 복사할 수 있습니다.
+
+```powershell
+Copy-Item backend/src/main/resources/application-gcp.example.yml backend/src/main/resources/application-gcp.yml
+```
+
 ```bash
 cd backend
 SPRING_PROFILES_ACTIVE=gcp \
 DB_HOST=127.0.0.1 \
-DB_PORT=3306 \
+DB_PORT=3307 \
 DB_NAME=merchant_sales \
 DB_USERNAME=merchant_app \
 DB_PASSWORD=your-db-password \
@@ -149,7 +161,7 @@ Windows PowerShell에서는 아래처럼 설정할 수 있습니다.
 ```powershell
 $env:SPRING_PROFILES_ACTIVE="gcp"
 $env:DB_HOST="127.0.0.1"
-$env:DB_PORT="3306"
+$env:DB_PORT="3307"
 $env:DB_NAME="merchant_sales"
 $env:DB_USERNAME="merchant_app"
 $env:DB_PASSWORD="your-db-password"
@@ -157,7 +169,7 @@ $env:FRANCHISE_JWT_SECRET="your-secret-key"
 gradle bootRun --no-problems-report
 ```
 
-Cloud SQL Auth Proxy를 사용할 경우 `DB_HOST=127.0.0.1`, `DB_PORT=3306`으로 두면 됩니다. Cloud SQL public/private IP로 직접 연결할 경우 `DB_HOST`에 해당 IP를 넣습니다.
+Cloud SQL Auth Proxy를 사용할 경우 `DB_HOST=127.0.0.1`, `DB_PORT=3307`으로 두면 됩니다. 로컬 MySQL이 3306 포트를 쓰지 않는 환경이라면 proxy를 3306으로 실행해도 됩니다. Cloud SQL public/private IP로 직접 연결할 경우 `DB_HOST`에 해당 IP를 넣고 보통 `DB_PORT=3306`을 사용합니다.
 
 초기 테이블과 샘플 데이터를 생성하려면 최초 1회만 `DB_INIT_MODE=always`를 추가합니다. SQL 파일은 `backend/src/main/resources/db/mysql/schema.sql`, `backend/src/main/resources/db/mysql/data.sql`에 있습니다. 초기 계정 비밀번호는 mock data와 동일하게 `1234`입니다.
 

@@ -7,19 +7,39 @@ build/
 dist/
 .gradle/
 .vite/
+node_modules/
 backend/build/
 backend/.gradle/
 frontend/dist/
 frontend/.vite/
 frontend/node_modules/.vite/
+frontend/node_modules/
 .run/
 
 # Local environment files
 .env
 *.env
 frontend/.env
+backend/.env
+backend/src/main/resources/application-gcp.yml
+*.local.yml
+application-local.yml
+application-secret.yml
+backend/src/main/resources/application-local.yml
+backend/src/main/resources/application-secret.yml
+
+# Local credentials and private keys
+*.key
+*.pem
+*.p12
+*.jks
+*service-account*.json
+*credentials*.json
+gcloud-*.json
+cloud-sql-proxy.exe
 
 # Editor and OS noise
+.vscode/settings.json
 .DS_Store
 Thumbs.db
 *.log

@@ -1,8 +1,8 @@
 package com.example.franchise.config;
 
 import com.example.franchise.domain.User;
+import com.example.franchise.service.FranchiseDataStore;
 import com.example.franchise.service.JwtService;
-import com.example.franchise.service.MockDataStore;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,11 +19,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public static final String CURRENT_USER_ATTRIBUTE = "currentUser";
 
     private final JwtService jwtService;
-    private final MockDataStore mockDataStore;
+    private final FranchiseDataStore dataStore;
 
-    public JwtAuthenticationFilter(JwtService jwtService, MockDataStore mockDataStore) {
+    public JwtAuthenticationFilter(JwtService jwtService, FranchiseDataStore dataStore) {
         this.jwtService = jwtService;
-        this.mockDataStore = mockDataStore;
+        this.dataStore = dataStore;
     }
 
     @Override
@@ -44,7 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             JwtService.Claims claims = jwtService.verify(authorization.substring("Bearer ".length()).trim());
-            User user = mockDataStore.findPublicUserById(claims.userId());
+            User user = dataStore.findPublicUserById(claims.userId());
             if (user == null) {
                 writeUnauthorized(response, "유효하지 않은 사용자입니다.");
                 return;
