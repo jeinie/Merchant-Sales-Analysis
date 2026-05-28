@@ -1,4 +1,4 @@
-# Franchise Sales Analysis Platform
+# Merchant Sales Analysis Platform
 
 지도 기반으로 프랜차이즈 가맹점의 매출 현황을 시각화하고, 전월 대비 성장률·거래 건수·객단가·업종/지역 평균 비교를 통해 본사 관리자와 영업 담당자의 의사결정을 지원하는 매출 분석 플랫폼입니다.
 
@@ -44,6 +44,7 @@
 - JWT 인증
 - PBKDF2 비밀번호 해시
 - In-memory mock data
+- GCP Cloud SQL(MySQL) 연동 프로필
 
 ## 프로젝트 구조
 
@@ -127,6 +128,39 @@ FRANCHISE_JWT_SECRET=your-secret-key
 
 설정하지 않으면 개발용 기본값이 사용됩니다. 운영 환경에서는 반드시 별도 secret을 설정해야 합니다.
 
+### GCP Cloud SQL(MySQL) 연동
+
+기본 실행은 기존처럼 in-memory mock data를 사용합니다. GCP Cloud SQL에 연결하려면 `gcp` 프로필과 DB 환경변수를 함께 설정합니다.
+
+```bash
+cd backend
+SPRING_PROFILES_ACTIVE=gcp \
+DB_HOST=127.0.0.1 \
+DB_PORT=3306 \
+DB_NAME=franchise_sales \
+DB_USERNAME=franchise_app \
+DB_PASSWORD=your-db-password \
+FRANCHISE_JWT_SECRET=your-secret-key \
+gradle bootRun --no-problems-report
+```
+
+Windows PowerShell에서는 아래처럼 설정할 수 있습니다.
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE="gcp"
+$env:DB_HOST="127.0.0.1"
+$env:DB_PORT="3306"
+$env:DB_NAME="franchise_sales"
+$env:DB_USERNAME="franchise_app"
+$env:DB_PASSWORD="your-db-password"
+$env:FRANCHISE_JWT_SECRET="your-secret-key"
+gradle bootRun --no-problems-report
+```
+
+Cloud SQL Auth Proxy를 사용할 경우 `DB_HOST=127.0.0.1`, `DB_PORT=3306`으로 두면 됩니다. Cloud SQL public/private IP로 직접 연결할 경우 `DB_HOST`에 해당 IP를 넣습니다.
+
+초기 테이블과 샘플 데이터를 생성하려면 최초 1회만 `DB_INIT_MODE=always`를 추가합니다. SQL 파일은 `backend/src/main/resources/db/mysql/schema.sql`, `backend/src/main/resources/db/mysql/data.sql`에 있습니다. 초기 계정 비밀번호는 mock data와 동일하게 `1234`입니다.
+
 ## 테스트 계정
 
 Mock data 기준 테스트 계정입니다.
@@ -182,7 +216,8 @@ Windows PowerShell에서 `npm` 실행 정책 문제가 있으면 `npm.cmd run li
 
 ## 구현 메모
 
-- 현재 데이터는 DB 연동 전 흐름 검증을 위한 in-memory mock data입니다.
+- 기본 실행의 데이터는 DB 연동 전 흐름 검증을 위한 in-memory mock data입니다.
+- `gcp` 프로필에서는 Cloud SQL MySQL 데이터를 JDBC로 조회/변경합니다.
 - 가맹점 데이터는 상승/보합/하락 상태를 모두 확인할 수 있도록 구성했습니다.
 - 마커 크기는 최근 월 매출 규모를 기준으로 계산합니다.
 - 마커 색상은 전월 대비 매출 성장률 기준으로 상승, 보합, 하락을 구분합니다.
