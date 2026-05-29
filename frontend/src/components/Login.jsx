@@ -37,10 +37,10 @@ const Login = ({ usersData, onLogin }) => {
       }}>
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <h1 style={{ color: '#111827', fontSize: '1.5rem', marginBottom: '10px' }}>
-            가맹점 통합 관리 시스템
+            가맹점 매출 분석 플랫폼
           </h1>
           <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
-            계정 정보를 입력하여 로그인하세요
+            매장별 매출 현황과 AI 인사이트를 확인하세요
           </p>
         </div>
 
