@@ -3,6 +3,7 @@ package com.example.franchise.service;
 import com.example.franchise.domain.Franchise;
 import com.example.franchise.domain.MonthlySales;
 import com.example.franchise.domain.User;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -14,7 +15,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-public class MockDataStore {
+@Profile("!gcp")
+public class MockDataStore implements FranchiseDataStore {
 
     private final PasswordHasher passwordHasher;
     private final List<Franchise> franchises = new ArrayList<>();
@@ -26,12 +28,14 @@ public class MockDataStore {
         seedFranchises();
     }
 
+    @Override
     public synchronized List<User> getPublicUsers() {
         return users.stream()
                 .map(this::publicUser)
                 .collect(Collectors.toList());
     }
 
+    @Override
     public synchronized List<User> getSalesUsers() {
         return users.stream()
                 .filter(user -> "SALES".equals(user.getRole()))
@@ -39,6 +43,7 @@ public class MockDataStore {
                 .collect(Collectors.toList());
     }
 
+    @Override
     public synchronized User login(String id, String password) {
         return users.stream()
                 .filter(user -> user.getId().equals(id) && passwordHasher.matches(password, user.getPasswordHash()))
@@ -47,6 +52,7 @@ public class MockDataStore {
                 .orElse(null);
     }
 
+    @Override
     public synchronized User findPublicUserById(String id) {
         return users.stream()
                 .filter(user -> user.getId().equals(id))
@@ -55,6 +61,7 @@ public class MockDataStore {
                 .orElse(null);
     }
 
+    @Override
     public synchronized List<Franchise> getFranchises(String userId, String role) {
         if (userId == null || userId.isBlank() || "ADMIN".equalsIgnoreCase(role)) {
             return franchises.stream()
@@ -77,6 +84,7 @@ public class MockDataStore {
                 .collect(Collectors.toList());
     }
 
+    @Override
     public synchronized Map<String, Object> getAverages() {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("industryAverages", calculateAverages(Franchise::getIndustry));
@@ -84,6 +92,7 @@ public class MockDataStore {
         return response;
     }
 
+    @Override
     public synchronized void assignManager(String franchiseId, String managerId) {
         boolean franchiseExists = franchises.stream().anyMatch(franchise -> franchise.getId().equals(franchiseId));
         if (!franchiseExists) {
@@ -114,6 +123,7 @@ public class MockDataStore {
         }
     }
 
+    @Override
     public synchronized void toggleAi(String userId, boolean canUseAI) {
         User user = users.stream()
                 .filter(item -> item.getId().equals(userId))
