@@ -70,11 +70,12 @@
 
 Java 17과 Gradle이 필요합니다. 백엔드는 GCP Cloud SQL(MySQL) 연결을 전제로 실행합니다.
 
-Windows 환경에서 Java 17 경로를 명시해 실행하려면 프로젝트에 포함된 helper script를 사용할 수 있습니다. 먼저 `gcp` 프로필과 DB 환경변수를 설정한 뒤 실행합니다.
+Windows 환경에서는 프로젝트에 포함된 helper script를 사용합니다. 이 스크립트는 `JAVA_HOME`을 Java 17로 지정하고, `SPRING_PROFILES_ACTIVE`가 비어 있으면 기본값으로 `gcp` 프로필을 활성화합니다.
+
+Cloud SQL Auth Proxy를 먼저 실행한 뒤, 다른 터미널에서 백엔드를 실행합니다.
 
 ```powershell
 cd backend
-$env:SPRING_PROFILES_ACTIVE="gcp"
 $env:DB_HOST="127.0.0.1"
 $env:DB_PORT="3307"
 $env:DB_NAME="merchant_sales"
@@ -83,6 +84,8 @@ $env:DB_PASSWORD="your-db-password"
 $env:FRANCHISE_JWT_SECRET="your-secret-key"
 .\gradle-java17.cmd bootRun --no-problems-report
 ```
+
+`SPRING_PROFILES_ACTIVE`를 직접 설정해도 됩니다. 별도로 설정하지 않으면 `gradle-java17.cmd`가 `gcp`를 사용합니다.
 
 일반 Gradle 환경에서는 아래처럼 실행할 수 있습니다.
 
@@ -144,7 +147,7 @@ FRANCHISE_JWT_SECRET=your-secret-key
 
 ### GCP Cloud SQL(MySQL) 연동
 
-현재 백엔드는 GCP Cloud SQL에 저장된 데이터를 사용합니다. 실행할 때는 `gcp` 프로필과 DB 환경변수를 함께 설정합니다.
+현재 백엔드는 GCP Cloud SQL에 저장된 데이터를 사용합니다. `JdbcFranchiseDataStore`는 `gcp` 프로필에서만 Spring Bean으로 등록되므로, 일반 Gradle로 실행할 때는 `SPRING_PROFILES_ACTIVE=gcp`를 반드시 설정해야 합니다. Windows helper script인 `backend/gradle-java17.cmd`는 이 값을 기본으로 설정합니다.
 
 `application-gcp.yml`은 로컬 DB 연결 정보를 담을 수 있으므로 Git에 포함하지 않습니다. 처음 설정할 때는 예시 파일을 복사해 로컬 설정 파일을 만듭니다.
 
@@ -158,6 +161,78 @@ Windows PowerShell에서는 아래처럼 복사할 수 있습니다.
 Copy-Item backend/src/main/resources/application-gcp.example.yml backend/src/main/resources/application-gcp.yml
 ```
 
+`application-gcp.yml`, `frontend/.env`, `backend/.env`, `application-local.yml`, `application-secret.yml`은 `.gitignore` 대상입니다. 새로 clone하면 내려오지 않으므로 로컬에서 직접 만들어야 합니다.
+
+#### Cloud SQL 인스턴스 권장 설정
+
+개발/테스트용으로 새 Cloud SQL 인스턴스를 만들 때는 아래 설정을 권장합니다.
+
+```text
+Edition: Enterprise
+Database version: MySQL 8.0
+Version preset: Sandbox
+Availability: Single zone
+Region: asia-northeast3 (Seoul)
+Zone: 기존에 리소스 부족 오류가 난 zone 제외
+```
+
+서울 region에서 계속 리소스 부족 오류가 나면 `asia-northeast1 (Tokyo)`를 우선 고려합니다. MySQL 사용자는 IAM DB 인증이 아니라 기본 제공 인증(Built-in authentication)으로 생성합니다.
+
+필수 DB 리소스:
+
+```text
+Database: merchant_sales
+User: merchant_app
+Authentication: Built-in authentication
+```
+
+#### Cloud SQL Auth Proxy 실행
+
+Cloud SQL 인스턴스가 `RUNNABLE` 상태가 되면 연결 이름을 확인합니다.
+
+```text
+프로젝트ID:리전:인스턴스명
+```
+
+CMD에서 실행:
+
+```cmd
+cloud-sql-proxy "프로젝트ID:리전:인스턴스명" --port 3307
+```
+
+PowerShell에서 실행 파일이 현재 폴더에 있으면 `.\`를 붙입니다.
+
+```powershell
+.\cloud-sql-proxy.exe "프로젝트ID:리전:인스턴스명" --port 3307
+```
+
+전체 경로로 실행할 수도 있습니다.
+
+```powershell
+& "C:\Users\사용자명\Downloads\cloud-sql-proxy.exe" "프로젝트ID:리전:인스턴스명" --port 3307
+```
+
+프록시가 정상 동작하는지 확인:
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 3307
+```
+
+#### 백엔드 실행
+
+```powershell
+cd backend
+$env:DB_HOST="127.0.0.1"
+$env:DB_PORT="3307"
+$env:DB_NAME="merchant_sales"
+$env:DB_USERNAME="merchant_app"
+$env:DB_PASSWORD="your-db-password"
+$env:FRANCHISE_JWT_SECRET="your-secret-key"
+.\gradle-java17.cmd bootRun --no-problems-report
+```
+
+일반 Gradle로 실행할 때는 프로필을 명시합니다.
+
 ```bash
 cd backend
 SPRING_PROFILES_ACTIVE=gcp \
@@ -170,22 +245,47 @@ FRANCHISE_JWT_SECRET=your-secret-key \
 gradle bootRun --no-problems-report
 ```
 
-Windows PowerShell에서는 아래처럼 설정할 수 있습니다.
+Cloud SQL Auth Proxy를 사용할 경우 `DB_HOST=127.0.0.1`, `DB_PORT=3307`으로 둡니다. Cloud SQL public/private IP로 직접 연결할 경우 `DB_HOST`에 해당 IP를 넣고 보통 `DB_PORT=3306`을 사용합니다.
+
+#### 최초 DB 초기화
+
+새 Cloud SQL 인스턴스에 초기 테이블과 샘플 데이터를 생성하려면 최초 1회만 `DB_INIT_MODE=always`를 추가합니다.
 
 ```powershell
-$env:SPRING_PROFILES_ACTIVE="gcp"
-$env:DB_HOST="127.0.0.1"
-$env:DB_PORT="3307"
-$env:DB_NAME="merchant_sales"
-$env:DB_USERNAME="merchant_app"
-$env:DB_PASSWORD="your-db-password"
-$env:FRANCHISE_JWT_SECRET="your-secret-key"
-gradle bootRun --no-problems-report
+$env:DB_INIT_MODE="always"
+.\gradle-java17.cmd bootRun --no-problems-report
 ```
 
-Cloud SQL Auth Proxy를 사용할 경우 `DB_HOST=127.0.0.1`, `DB_PORT=3307`으로 두면 됩니다. 로컬 MySQL이 3306 포트를 쓰지 않는 환경이라면 proxy를 3306으로 실행해도 됩니다. Cloud SQL public/private IP로 직접 연결할 경우 `DB_HOST`에 해당 IP를 넣고 보통 `DB_PORT=3306`을 사용합니다.
+초기화 후 다음 실행부터는 `never`로 바꾸거나 새 터미널을 열어 기본값을 사용합니다.
 
-초기 테이블과 샘플 데이터를 생성하려면 최초 1회만 `DB_INIT_MODE=always`를 추가합니다. SQL 파일은 `backend/src/main/resources/db/mysql/schema.sql`, `backend/src/main/resources/db/mysql/data.sql`에 있습니다. 초기 계정 비밀번호는 `1234`입니다.
+```powershell
+$env:DB_INIT_MODE="never"
+```
+
+SQL 파일은 `backend/src/main/resources/db/mysql/schema.sql`, `backend/src/main/resources/db/mysql/data.sql`에 있습니다. 초기 계정 비밀번호는 `1234`입니다.
+
+#### 자주 발생하는 오류
+
+`No qualifying bean of type 'FranchiseDataStore'`
+
+`gcp` 프로필이 활성화되지 않은 상태입니다. Windows에서는 `.\gradle-java17.cmd bootRun --no-problems-report`를 사용하고, 일반 Gradle에서는 `SPRING_PROFILES_ACTIVE=gcp`를 설정합니다.
+
+`Communications link failure`
+
+백엔드가 MySQL에 연결하지 못한 상태입니다. Cloud SQL Auth Proxy가 켜져 있는지, `DB_HOST=127.0.0.1`, `DB_PORT=3307`이 맞는지 확인합니다.
+
+`SSL connection required for plugin "mysql_clear_password"`
+
+Cloud SQL 사용자를 IAM DB 인증으로 만든 경우 발생할 수 있습니다. 이 프로젝트는 기본 제공 인증(Built-in authentication) 사용자와 비밀번호 방식을 전제로 합니다.
+
+`Port 8080 was already in use`
+
+8080 포트를 쓰는 프로세스를 종료하거나 다른 포트로 실행합니다.
+
+```powershell
+$pid8080 = (Get-NetTCPConnection -LocalPort 8080 -State Listen).OwningProcess
+Stop-Process -Id $pid8080 -Force
+```
 
 ## 테스트 계정
 
