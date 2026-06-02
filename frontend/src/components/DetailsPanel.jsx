@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { generateFranchiseInsight } from '../utils/ai';
+import { Maximize2, X } from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -35,11 +36,13 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
   const [aiInsight, setAiInsight] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
 
   useEffect(() => {
     // Reset AI insight when a different franchise is selected
     setAiInsight(null);
     setAiError(null);
+    setIsInsightModalOpen(false);
   }, [franchise.id]);
 
   const handleGenerateInsight = async () => {
@@ -111,6 +114,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
   const growthRate = (((latestSales - prevSales) / prevSales) * 100).toFixed(1);
 
   return (
+    <>
     <div className="details-panel open">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 className="section-title" style={{ margin: 0 }}>{franchise.name} 상세 정보</h2>
@@ -133,20 +137,33 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <h3 className="section-title" style={{ margin: 0 }}>✨ AI 운영 인사이트</h3>
-          {(!aiInsight && currentUser?.permissions?.canUseAI !== false) && (
-            <button 
-              onClick={handleGenerateInsight} 
-              disabled={isGenerating}
-              style={{
-                backgroundColor: '#8b5cf6', color: 'white', border: 'none', 
-                padding: '8px 16px', borderRadius: '8px', cursor: isGenerating ? 'wait' : 'pointer',
-                fontWeight: 'bold', fontSize: '0.9rem', transition: 'background-color 0.2s',
-                boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
-              }}
-            >
-              {isGenerating ? '분석 중... ⏳' : 'Gemini 분석하기'}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {aiInsight && (
+              <button
+                type="button"
+                onClick={() => setIsInsightModalOpen(true)}
+                className="icon-button"
+                aria-label="AI 인사이트 크게 보기"
+                title="AI 인사이트 크게 보기"
+              >
+                <Maximize2 size={16} strokeWidth={2.2} />
+              </button>
+            )}
+            {(!aiInsight && currentUser?.permissions?.canUseAI !== false) && (
+              <button 
+                onClick={handleGenerateInsight} 
+                disabled={isGenerating}
+                style={{
+                  backgroundColor: '#8b5cf6', color: 'white', border: 'none', 
+                  padding: '8px 16px', borderRadius: '8px', cursor: isGenerating ? 'wait' : 'pointer',
+                  fontWeight: 'bold', fontSize: '0.9rem', transition: 'background-color 0.2s',
+                  boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
+                }}
+              >
+                {isGenerating ? '분석 중... ⏳' : 'Gemini 분석하기'}
+              </button>
+            )}
+          </div>
         </div>
         
         <div className="ai-insight" style={{ 
@@ -175,6 +192,37 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
         </div>
       </div>
     </div>
+
+    {isInsightModalOpen && aiInsight && (
+      <div className="insight-modal-backdrop" onClick={() => setIsInsightModalOpen(false)}>
+        <section
+          className="insight-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ai-insight-modal-title"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="insight-modal-header">
+            <div>
+              <div className="metric-label">AI 운영 인사이트</div>
+              <h2 id="ai-insight-modal-title">{franchise.name}</h2>
+            </div>
+            <button
+              type="button"
+              className="modal-close-button"
+              onClick={() => setIsInsightModalOpen(false)}
+              aria-label="AI 인사이트 크게 보기 닫기"
+            >
+              <X size={18} strokeWidth={2.2} />
+            </button>
+          </div>
+          <div className="insight-modal-body">
+            {aiInsight}
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 };
 
