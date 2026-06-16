@@ -1,5 +1,6 @@
 package com.example.franchise.service;
 
+import com.example.franchise.domain.AiInsightHistory;
 import com.example.franchise.domain.Franchise;
 import com.example.franchise.domain.MonthlySales;
 import com.example.franchise.domain.User;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -99,6 +101,64 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
         response.put("industryAverages", calculateAverages(franchises, Franchise::getIndustry));
         response.put("regionAverages", calculateAverages(franchises, Franchise::getRegion));
         return response;
+    }
+
+    @Override
+    public List<AiInsightHistory> getAiInsights(String franchiseId) {
+        return jdbcTemplate.query("""
+                        SELECT h.id, h.franchise_id, h.created_by, u.name AS created_by_name,
+                               h.sales_month, h.risk_level, h.summary, h.content, h.tags, h.created_at
+                        FROM ai_insight_histories h
+                        JOIN users u ON u.id = h.created_by
+                        WHERE h.franchise_id = ?
+                        ORDER BY h.created_at DESC, h.id DESC
+                        """,
+                this::mapAiInsightHistory,
+                franchiseId);
+    }
+
+    @Override
+    public AiInsightHistory getLatestAiInsight(String franchiseId) {
+        try {
+            return jdbcTemplate.queryForObject("""
+                            SELECT h.id, h.franchise_id, h.created_by, u.name AS created_by_name,
+                                   h.sales_month, h.risk_level, h.summary, h.content, h.tags, h.created_at
+                            FROM ai_insight_histories h
+                            JOIN users u ON u.id = h.created_by
+                            WHERE h.franchise_id = ?
+                            ORDER BY h.created_at DESC, h.id DESC
+                            LIMIT 1
+                            """,
+                    this::mapAiInsightHistory,
+                    franchiseId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    @Override
+    public AiInsightHistory saveAiInsight(
+            String franchiseId,
+            String createdBy,
+            String salesMonth,
+            String riskLevel,
+            String summary,
+            String content,
+            List<String> tags) {
+        jdbcTemplate.update("""
+                        INSERT INTO ai_insight_histories
+                            (franchise_id, created_by, sales_month, risk_level, summary, content, tags)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                franchiseId,
+                createdBy,
+                salesMonth,
+                riskLevel,
+                summary,
+                content,
+                String.join(",", tags));
+
+        return getLatestAiInsight(franchiseId);
     }
 
     @Override
@@ -266,6 +326,34 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
         monthlySales.setTxCount(rs.getInt("tx_count"));
         monthlySales.setAvgTicket(rs.getInt("avg_ticket"));
         return monthlySales;
+    }
+
+    private AiInsightHistory mapAiInsightHistory(ResultSet rs, int rowNum) throws SQLException {
+        AiInsightHistory history = new AiInsightHistory();
+        history.setId(rs.getLong("id"));
+        history.setFranchiseId(rs.getString("franchise_id"));
+        history.setCreatedBy(rs.getString("created_by"));
+        history.setCreatedByName(rs.getString("created_by_name"));
+        history.setSalesMonth(rs.getString("sales_month"));
+        history.setRiskLevel(rs.getString("risk_level"));
+        history.setSummary(rs.getString("summary"));
+        history.setContent(rs.getString("content"));
+        history.setTags(splitTags(rs.getString("tags")));
+
+        Timestamp createdAt = rs.getTimestamp("created_at");
+        history.setCreatedAt(createdAt == null ? null : createdAt.toInstant());
+        return history;
+    }
+
+    private List<String> splitTags(String tags) {
+        if (tags == null || tags.isBlank()) {
+            return List.of();
+        }
+
+        return List.of(tags.split(",")).stream()
+                .map(String::trim)
+                .filter(tag -> !tag.isBlank())
+                .toList();
     }
 
     private Double nullableDouble(ResultSet rs, String columnName) throws SQLException {

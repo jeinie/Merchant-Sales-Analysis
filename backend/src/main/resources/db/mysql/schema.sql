@@ -50,3 +50,23 @@ CREATE TABLE IF NOT EXISTS user_franchise_assignments (
         FOREIGN KEY (franchise_id) REFERENCES franchises (id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_insight_histories (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    franchise_id VARCHAR(20) NOT NULL,
+    created_by VARCHAR(64) NOT NULL,
+    sales_month CHAR(7) NOT NULL,
+    risk_level VARCHAR(20) NOT NULL,
+    summary VARCHAR(500) NOT NULL,
+    content TEXT NOT NULL,
+    tags VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_ai_insight_franchise_month (franchise_id, sales_month),
+    CONSTRAINT fk_ai_insight_franchise
+        FOREIGN KEY (franchise_id) REFERENCES franchises (id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_ai_insight_user
+        FOREIGN KEY (created_by) REFERENCES users (id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,5 +1,6 @@
 package com.example.franchise.service;
 
+import com.example.franchise.domain.AiInsightHistory;
 import com.example.franchise.domain.Franchise;
 import com.example.franchise.domain.User;
 
@@ -18,6 +19,19 @@ public interface FranchiseDataStore {
     List<Franchise> getFranchises(String userId, String role);
 
     Map<String, Object> getAverages();
+
+    List<AiInsightHistory> getAiInsights(String franchiseId);
+
+    AiInsightHistory getLatestAiInsight(String franchiseId);
+
+    AiInsightHistory saveAiInsight(
+            String franchiseId,
+            String createdBy,
+            String salesMonth,
+            String riskLevel,
+            String summary,
+            String content,
+            List<String> tags);
 
     void assignManager(String franchiseId, String managerId);
 

@@ -10,6 +10,11 @@ public class Franchise {
     private String address;
     private Double latitude;
     private Double longitude;
+    private String riskLevel;
+    private Integer priorityScore;
+    private String riskSummary;
+    private List<String> alertTags;
+    private List<String> alertReasons;
     
     // For nesting the monthly sales data
     private List<MonthlySales> monthlySales;
@@ -68,6 +73,46 @@ public class Franchise {
 
     public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+
+    public String getRiskLevel() {
+        return riskLevel;
+    }
+
+    public void setRiskLevel(String riskLevel) {
+        this.riskLevel = riskLevel;
+    }
+
+    public Integer getPriorityScore() {
+        return priorityScore;
+    }
+
+    public void setPriorityScore(Integer priorityScore) {
+        this.priorityScore = priorityScore;
+    }
+
+    public String getRiskSummary() {
+        return riskSummary;
+    }
+
+    public void setRiskSummary(String riskSummary) {
+        this.riskSummary = riskSummary;
+    }
+
+    public List<String> getAlertTags() {
+        return alertTags;
+    }
+
+    public void setAlertTags(List<String> alertTags) {
+        this.alertTags = alertTags;
+    }
+
+    public List<String> getAlertReasons() {
+        return alertReasons;
+    }
+
+    public void setAlertReasons(List<String> alertReasons) {
+        this.alertReasons = alertReasons;
     }
 
     public List<MonthlySales> getMonthlySales() {
