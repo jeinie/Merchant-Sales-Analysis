@@ -17,6 +17,9 @@ frontend/node_modules/.vite/
 frontend/node_modules/
 .run/
 
+# Local portfolio export
+portfolio/
+
 # Local environment files
 .env
 *.env
