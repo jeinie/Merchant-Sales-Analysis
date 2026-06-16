@@ -6,6 +6,12 @@ import Login from './components/Login';
 import AdminPage from './components/AdminPage';
 import { api } from './utils/api';
 
+const RISK_LABELS = {
+  CHECK_REQUIRED: '점검 필요',
+  CAUTION: '주의',
+  NORMAL: '정상 관찰',
+};
+
 function App() {
   // Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
@@ -15,6 +21,7 @@ function App() {
 
   const [usersData, setUsersData] = useState([]);
   const [franchises, setFranchises] = useState([]);
+  const [alerts, setAlerts] = useState([]);
   const [averages, setAverages] = useState({ 
     industryAverages: {}, 
     regionAverages: {} 
@@ -32,6 +39,7 @@ function App() {
     setSelectedFranchiseId(null);
     setCurrentView('dashboard');
     setFranchises([]);
+    setAlerts([]);
   };
 
   // Load all required data from the authenticated backend API.
@@ -44,6 +52,9 @@ function App() {
     try {
       const franchiseList = await api.getFranchises();
       setFranchises(franchiseList);
+
+      const alertList = await api.getAlerts();
+      setAlerts(alertList);
 
       const averageData = await api.getAverages();
       setAverages(averageData);
@@ -88,18 +99,11 @@ function App() {
     return regionMatch && industryMatch;
   });
 
-  // Alerts for sales spikes/drop (now that filteredFranchises is defined)
   const [showAlerts, setShowAlerts] = React.useState(false);
-  const alerts = filteredFranchises.reduce((acc, fr) => {
-    if (fr.monthlySales && fr.monthlySales.length >= 2) {
-      const latest = fr.monthlySales[fr.monthlySales.length - 1].sales;
-      const prev = fr.monthlySales[fr.monthlySales.length - 2].sales;
-      const diff = (latest - prev) / prev;
-      if (diff <= -0.15) acc.push({ type: 'down', franchise: fr, rate: diff * 100 });
-      else if (diff >= 0.20) acc.push({ type: 'up', franchise: fr, rate: diff * 100 });
-    }
-    return acc;
-  }, []);
+  const filteredFranchiseIds = new Set(filteredFranchises.map(franchise => franchise.id));
+  const visibleAlerts = alerts.filter(alert => filteredFranchiseIds.has(alert.franchiseId));
+  const checkRequiredCount = visibleAlerts.filter(alert => alert.riskLevel === 'CHECK_REQUIRED').length;
+  const cautionCount = visibleAlerts.filter(alert => alert.riskLevel === 'CAUTION').length;
 
   const selectedFranchise = franchises.find(f => f.id === selectedFranchiseId);
 
@@ -163,25 +167,42 @@ function App() {
             return (avg / 10000).toFixed(2);
           })()}</div>
         </div>
+        <div className="card">
+          <div className="metric-label">운영 알림</div>
+          <div className="metric-value">{visibleAlerts.length}건</div>
+          <div className="metric-label">점검 {checkRequiredCount} · 주의 {cautionCount}</div>
+        </div>
       </div>
        <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: '20px' }}>
          <div style={{ fontWeight: 'bold' }}>가맹점 매출 시각화 및 AI 분석 플랫폼</div>
          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', fontSize: '0.9rem' }}>
-           {/* 알림 아이콘 */}
            <div style={{ position: 'relative' }}>
              <span style={{ cursor: 'pointer' }} onClick={() => setShowAlerts(!showAlerts)}>🔔</span>
-             {alerts.length > 0 && (
-               <span style={{ position: 'absolute', top: '-4px', right: '-8px', backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', padding: '2px 5px', fontSize: '0.7rem' }}>{alerts.length}</span>
+             {visibleAlerts.length > 0 && (
+               <span style={{ position: 'absolute', top: '-4px', right: '-8px', backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', padding: '2px 5px', fontSize: '0.7rem' }}>{visibleAlerts.length}</span>
              )}
              {showAlerts && (
-               <div style={{ position: 'absolute', right: 0, top: '24px', backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', width: '240px', zIndex: 10 }}>
-                 <ul style={{ listStyle: 'none', margin: 0, padding: '8px' }}>
-                   {alerts.map((a, idx) => (
-                     <li key={idx} style={{ padding: '4px 0', cursor: 'pointer' }} onClick={() => { setSelectedFranchiseId(a.franchise.id); setShowAlerts(false); }}>
-                       {a.type === 'down' ? '🔻' : '🔺'} {a.franchise.name}: {a.type === 'down' ? '하락' : '상승'} {Math.abs(a.rate).toFixed(1)}%
+               <div className="alert-popover">
+                 <div className="alert-popover-title">운영 알림</div>
+                 {visibleAlerts.length === 0 ? (
+                   <div className="alert-empty">현재 필터에서 확인할 알림이 없습니다.</div>
+                 ) : (
+                   <ul className="alert-list">
+                   {visibleAlerts.map((alert) => (
+                     <li key={alert.franchiseId} onClick={() => { setSelectedFranchiseId(alert.franchiseId); setShowAlerts(false); }}>
+                       <div className="alert-row-header">
+                         <span className={`risk-badge ${alert.riskLevel?.toLowerCase()}`}>{RISK_LABELS[alert.riskLevel] || alert.riskLevel}</span>
+                         <span className="alert-score">{alert.priorityScore}점</span>
+                       </div>
+                       <strong>{alert.franchiseName}</strong>
+                       <div className="alert-summary">{alert.summary}</div>
+                       <div className="alert-meta">
+                         {alert.latestMonth} · 전월 대비 {alert.salesGrowthRate > 0 ? '+' : ''}{alert.salesGrowthRate.toFixed(1)}%
+                       </div>
                      </li>
                    ))}
-                 </ul>
+                   </ul>
+                 )}
                </div>
              )}
            </div>
@@ -222,6 +243,7 @@ function App() {
         franchises={filteredFranchises}
         selectedFranchiseId={selectedFranchiseId}
         setSelectedFranchiseId={setSelectedFranchiseId}
+        riskLabels={RISK_LABELS}
       />
         
         <MapArea 

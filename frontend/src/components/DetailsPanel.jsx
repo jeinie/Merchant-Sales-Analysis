@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { generateFranchiseInsight } from '../utils/ai';
+import { api } from '../utils/api';
 import { Maximize2, X } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -23,7 +24,132 @@ ChartJS.register(
   Legend
 );
 
+const renderInlineMarkdown = (text) => {
+  return text.split(/(\*\*.+?\*\*)/g).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+
+    return part;
+  });
+};
+
+const AiInsightMarkdown = ({ content }) => {
+  const lines = content
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const elements = [];
+  let listItems = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+
+    elements.push(
+      <ul className="ai-insight-list" key={`list-${elements.length}`}>
+        {listItems}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  lines.forEach((line, index) => {
+    if (/^\*\*.+\*\*$/.test(line)) {
+      flushList();
+      elements.push(
+        <h4 className="ai-insight-heading" key={`heading-${index}`}>
+          {line.slice(2, -2)}
+        </h4>
+      );
+      return;
+    }
+
+    if (/^#{1,3}\s+/.test(line)) {
+      flushList();
+      elements.push(
+        <h4 className="ai-insight-heading" key={`heading-${index}`}>
+          {line.replace(/^#{1,3}\s+/, '')}
+        </h4>
+      );
+      return;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      const item = line.replace(/^[-*]\s+/, '');
+      const markdownLabelMatch = item.match(/^\*\*([^*]+?)\*\*\s*[:：]?\s*(.*)$/);
+      const plainLabelMatch = item.match(/^([^:：]+[:：])\s*(.*)$/);
+
+      listItems.push(
+        <li key={`item-${index}`}>
+          {markdownLabelMatch ? (
+            <>
+              <strong>{markdownLabelMatch[1]}:</strong>
+              {markdownLabelMatch[2] && <span> {renderInlineMarkdown(markdownLabelMatch[2])}</span>}
+            </>
+          ) : plainLabelMatch ? (
+            <>
+              <strong>{plainLabelMatch[1]}</strong>
+              {plainLabelMatch[2] && <span> {renderInlineMarkdown(plainLabelMatch[2])}</span>}
+            </>
+          ) : (
+            renderInlineMarkdown(item)
+          )}
+        </li>
+      );
+      return;
+    }
+
+    flushList();
+    elements.push(
+      <p className="ai-insight-paragraph" key={`paragraph-${index}`}>
+        {renderInlineMarkdown(line)}
+      </p>
+    );
+  });
+
+  flushList();
+
+  return <div className="ai-insight-markdown">{elements}</div>;
+};
+
 const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
+  const [aiInsight, setAiInsight] = useState(null);
+  const [aiInsightMeta, setAiInsightMeta] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAiInsight(null);
+    setAiInsightMeta(null);
+    setAiError(null);
+    setIsInsightModalOpen(false);
+
+    if (!franchise) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    api.getLatestAiInsight(franchise.id)
+      .then((latest) => {
+        if (cancelled || !latest) return;
+        setAiInsight(latest.content);
+        setAiInsightMeta(latest);
+      })
+      .catch((err) => {
+        if (!cancelled && err.status !== 404) {
+          console.error('AI 인사이트 이력 조회 실패:', err);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [franchise?.id]);
+
   if (!franchise) {
     return (
       <div className="details-panel" style={{ transform: 'translateX(100%)' }}>
@@ -32,18 +158,11 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
   }
 
   const { industryAverages, regionAverages } = averages;
-
-  const [aiInsight, setAiInsight] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiError, setAiError] = useState(null);
-  const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
-
-  useEffect(() => {
-    // Reset AI insight when a different franchise is selected
-    setAiInsight(null);
-    setAiError(null);
-    setIsInsightModalOpen(false);
-  }, [franchise.id]);
+  const riskLabel = {
+    CHECK_REQUIRED: '점검 필요',
+    CAUTION: '주의',
+    NORMAL: '정상 관찰',
+  }[franchise.riskLevel] || franchise.riskLevel || '정상 관찰';
 
   const handleGenerateInsight = async () => {
     setIsGenerating(true);
@@ -51,6 +170,19 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     try {
       const insight = await generateFranchiseInsight(franchise, averages);
       setAiInsight(insight);
+      const latestMonth = franchise.monthlySales?.[franchise.monthlySales.length - 1]?.month || '';
+      try {
+        const saved = await api.saveAiInsight(franchise.id, {
+          salesMonth: latestMonth,
+          riskLevel: franchise.riskLevel || 'NORMAL',
+          summary: franchise.riskSummary || `${franchise.name} AI 운영 인사이트`,
+          content: insight,
+          tags: franchise.alertTags || [],
+        });
+        setAiInsightMeta(saved);
+      } catch (saveError) {
+        console.error('AI 인사이트 저장 실패:', saveError);
+      }
     } catch (err) {
       setAiError(err.message);
     } finally {
@@ -129,6 +261,29 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
         </div>
       </div>
 
+      <div className={`card risk-card ${franchise.riskLevel?.toLowerCase() || 'normal'}`}>
+        <div className="risk-card-header">
+          <span className={`risk-badge ${franchise.riskLevel?.toLowerCase() || 'normal'}`}>{riskLabel}</span>
+          <span className="alert-score">{franchise.priorityScore || 0}점</span>
+        </div>
+        <h3 className="section-title">점검 사유</h3>
+        <p className="risk-summary-text">{franchise.riskSummary || '현재 기준에서는 정상 관찰 대상입니다.'}</p>
+        {franchise.alertReasons?.length > 0 && (
+          <ul className="risk-reason-list">
+            {franchise.alertReasons.map((reason, index) => (
+              <li key={index}>{reason}</li>
+            ))}
+          </ul>
+        )}
+        {franchise.alertTags?.length > 0 && (
+          <div className="risk-tag-list">
+            {franchise.alertTags.map((tag) => (
+              <span key={tag}>{tag}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="card">
         <h3 className="section-title">월별 매출 추이</h3>
         <Line options={options} data={data} />
@@ -136,7 +291,14 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h3 className="section-title" style={{ margin: 0 }}>✨ AI 운영 인사이트</h3>
+          <div>
+            <h3 className="section-title" style={{ margin: 0 }}>✨ AI 운영 인사이트</h3>
+            {aiInsightMeta && (
+              <div className="ai-insight-meta">
+                저장됨 · {aiInsightMeta.salesMonth} · {aiInsightMeta.createdByName || aiInsightMeta.createdBy}
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {aiInsight && (
               <button
@@ -149,7 +311,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
                 <Maximize2 size={16} strokeWidth={2.2} />
               </button>
             )}
-            {(!aiInsight && currentUser?.permissions?.canUseAI !== false) && (
+            {currentUser?.permissions?.canUseAI !== false && (
               <button 
                 onClick={handleGenerateInsight} 
                 disabled={isGenerating}
@@ -160,15 +322,14 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
                   boxShadow: '0 2px 4px rgba(139, 92, 246, 0.3)'
                 }}
               >
-                {isGenerating ? '분석 중... ⏳' : 'Gemini 분석하기'}
+                {isGenerating ? '분석 중... ⏳' : aiInsight ? '새 분석 생성' : 'Gemini 분석하기'}
               </button>
             )}
           </div>
         </div>
         
         <div className="ai-insight" style={{ 
-          minHeight: '100px', whiteSpace: 'pre-line', lineHeight: '1.6', 
-          fontSize: '0.95rem', color: '#374151' 
+          minHeight: '100px', lineHeight: '1.6', fontSize: '0.95rem', color: '#374151' 
         }}>
           {isGenerating ? (
             <div style={{ textAlign: 'center', color: '#6b7280', padding: '30px 10px' }}>
@@ -179,7 +340,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
               {aiError}
             </div>
           ) : aiInsight ? (
-            <div>{aiInsight}</div>
+            <AiInsightMarkdown content={aiInsight} />
           ) : currentUser?.permissions?.canUseAI === false ? (
             <div style={{ color: '#ef4444', textAlign: 'center', padding: '30px 10px', fontWeight: 'bold' }}>
               ⚠️ AI 운영 인사이트 기능 사용 권한이 없습니다.<br/>관리자에게 문의해주세요.
@@ -217,7 +378,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
             </button>
           </div>
           <div className="insight-modal-body">
-            {aiInsight}
+            <AiInsightMarkdown content={aiInsight} />
           </div>
         </section>
       </div>

@@ -121,6 +121,25 @@ export const api = {
     return request('/averages');
   },
 
+  async getAlerts() {
+    return request('/alerts');
+  },
+
+  async getAiInsights(franchiseId) {
+    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights`);
+  },
+
+  async getLatestAiInsight(franchiseId) {
+    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights/latest`);
+  },
+
+  async saveAiInsight(franchiseId, payload) {
+    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights`, {
+      method: 'POST',
+      body: payload,
+    });
+  },
+
   async getAdminUsers() {
     return request('/admin/users');
   },

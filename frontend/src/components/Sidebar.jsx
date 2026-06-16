@@ -8,7 +8,8 @@ const Sidebar = ({
   franchisesCount,
   franchises,
   selectedFranchiseId,
-  setSelectedFranchiseId
+  setSelectedFranchiseId,
+  riskLabels = {}
 }) => {
   return (
     <aside className="sidebar">
@@ -53,10 +54,20 @@ const Sidebar = ({
         <ul style={{ listStyle: 'none', padding: 0, maxHeight: '300px', overflowY: 'auto' }}>
           {franchises.map(fr => (
             <li key={fr.id}
-                style={{ padding: '8px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}
+                style={{ padding: '10px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}
                 onClick={() => setSelectedFranchiseId(fr.id)}>
-              <span style={{ fontWeight: selectedFranchiseId === fr.id ? '600' : '400' }}>{fr.name}</span>
+              <div className="franchise-list-header">
+                <span style={{ fontWeight: selectedFranchiseId === fr.id ? '600' : '400' }}>{fr.name}</span>
+                {fr.riskLevel && fr.riskLevel !== 'NORMAL' && (
+                  <span className={`risk-badge compact ${fr.riskLevel.toLowerCase()}`}>
+                    {riskLabels[fr.riskLevel] || fr.riskLevel}
+                  </span>
+                )}
+              </div>
               <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{fr.region} / {fr.industry}</div>
+              {fr.riskSummary && fr.riskLevel !== 'NORMAL' && (
+                <div className="franchise-risk-summary">{fr.riskSummary}</div>
+              )}
             </li>
           ))}
         </ul>
