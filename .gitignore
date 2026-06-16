@@ -22,6 +22,9 @@ frontend/node_modules/
 *.env
 frontend/.env
 backend/.env
+!.env.example
+!*.env.example
+!backend/.env.example
 backend/src/main/resources/application-gcp.yml
 *.local.yml
 application-local.yml
@@ -44,3 +47,6 @@ cloud-sql-proxy*.exe
 .DS_Store
 Thumbs.db
 *.log
+
+# porfolio
+portfolio/
