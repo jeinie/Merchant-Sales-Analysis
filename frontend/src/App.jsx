@@ -4,6 +4,7 @@ import MapArea from './components/MapArea';
 import DetailsPanel from './components/DetailsPanel';
 import Login from './components/Login';
 import AdminPage from './components/AdminPage';
+import AlertsPopover from './components/AlertsPopover';
 import { api } from './utils/api';
 
 const RISK_LABELS = {
@@ -31,6 +32,7 @@ function App() {
   const [selectedRegion, setSelectedRegion] = useState('전체');
   const [selectedIndustry, setSelectedIndustry] = useState('전체');
   const [selectedFranchiseId, setSelectedFranchiseId] = useState(null);
+  const [showAlerts, setShowAlerts] = useState(false);
 
   const handleLogout = () => {
     api.logout();
@@ -99,7 +101,6 @@ function App() {
     return regionMatch && industryMatch;
   });
 
-  const [showAlerts, setShowAlerts] = React.useState(false);
   const filteredFranchiseIds = new Set(filteredFranchises.map(franchise => franchise.id));
   const visibleAlerts = alerts.filter(alert => filteredFranchiseIds.has(alert.franchiseId));
   const checkRequiredCount = visibleAlerts.filter(alert => alert.riskLevel === 'CHECK_REQUIRED').length;
@@ -176,36 +177,14 @@ function App() {
        <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: '20px' }}>
          <div style={{ fontWeight: 'bold' }}>가맹점 매출 시각화 및 AI 분석 플랫폼</div>
          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', fontSize: '0.9rem' }}>
-           <div style={{ position: 'relative' }}>
-             <span style={{ cursor: 'pointer' }} onClick={() => setShowAlerts(!showAlerts)}>🔔</span>
-             {visibleAlerts.length > 0 && (
-               <span style={{ position: 'absolute', top: '-4px', right: '-8px', backgroundColor: '#ef4444', color: 'white', borderRadius: '50%', padding: '2px 5px', fontSize: '0.7rem' }}>{visibleAlerts.length}</span>
-             )}
-             {showAlerts && (
-               <div className="alert-popover">
-                 <div className="alert-popover-title">운영 알림</div>
-                 {visibleAlerts.length === 0 ? (
-                   <div className="alert-empty">현재 필터에서 확인할 알림이 없습니다.</div>
-                 ) : (
-                   <ul className="alert-list">
-                   {visibleAlerts.map((alert) => (
-                     <li key={alert.franchiseId} onClick={() => { setSelectedFranchiseId(alert.franchiseId); setShowAlerts(false); }}>
-                       <div className="alert-row-header">
-                         <span className={`risk-badge ${alert.riskLevel?.toLowerCase()}`}>{RISK_LABELS[alert.riskLevel] || alert.riskLevel}</span>
-                         <span className="alert-score">{alert.priorityScore}점</span>
-                       </div>
-                       <strong>{alert.franchiseName}</strong>
-                       <div className="alert-summary">{alert.summary}</div>
-                       <div className="alert-meta">
-                         {alert.latestMonth} · 전월 대비 {alert.salesGrowthRate > 0 ? '+' : ''}{alert.salesGrowthRate.toFixed(1)}%
-                       </div>
-                     </li>
-                   ))}
-                   </ul>
-                 )}
-               </div>
-             )}
-           </div>
+           <AlertsPopover
+             alerts={visibleAlerts}
+             isOpen={showAlerts}
+             onToggle={() => setShowAlerts((open) => !open)}
+             onClose={() => setShowAlerts(false)}
+             onSelectAlert={(alert) => setSelectedFranchiseId(alert.franchiseId)}
+             riskLabels={RISK_LABELS}
+           />
            {currentUser.role === 'ADMIN' && (
              <button 
                onClick={() => setCurrentView('admin')}
