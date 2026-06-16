@@ -5,3 +5,6 @@ app:
   auth:
     jwt-secret: ${FRANCHISE_JWT_SECRET:dev-only-change-this-secret-before-production}
     jwt-expiration-minutes: 960
+  ai:
+    gemini-api-key: ${GEMINI_API_KEY:${VITE_GEMINI_API_KEY:}}
+    gemini-model: ${GEMINI_MODEL:gemini-2.5-flash}

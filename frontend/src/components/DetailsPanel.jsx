@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { generateFranchiseInsight } from '../utils/ai';
 import { api } from '../utils/api';
-import { Maximize2, X } from 'lucide-react';
+import { History, Maximize2, Save, X } from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -116,6 +115,11 @@ const AiInsightMarkdown = ({ content }) => {
 const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
   const [aiInsight, setAiInsight] = useState(null);
   const [aiInsightMeta, setAiInsightMeta] = useState(null);
+  const [aiInsightHistories, setAiInsightHistories] = useState([]);
+  const [activeInsightTab, setActiveInsightTab] = useState('current');
+  const [selectedHistoryId, setSelectedHistoryId] = useState(null);
+  const [insightNote, setInsightNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
@@ -124,6 +128,10 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     let cancelled = false;
     setAiInsight(null);
     setAiInsightMeta(null);
+    setAiInsightHistories([]);
+    setActiveInsightTab('current');
+    setSelectedHistoryId(null);
+    setInsightNote('');
     setAiError(null);
     setIsInsightModalOpen(false);
 
@@ -133,11 +141,17 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
       };
     }
 
-    api.getLatestAiInsight(franchise.id)
-      .then((latest) => {
-        if (cancelled || !latest) return;
+    Promise.all([
+      api.getLatestAiInsight(franchise.id),
+      api.getAiInsights(franchise.id),
+    ])
+      .then(([latest, histories]) => {
+        if (cancelled) return;
+        setAiInsightHistories(histories || []);
+        if (!latest) return;
         setAiInsight(latest.content);
         setAiInsightMeta(latest);
+        setInsightNote(latest.note || '');
       })
       .catch((err) => {
         if (!cancelled && err.status !== 404) {
@@ -168,25 +182,52 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     setIsGenerating(true);
     setAiError(null);
     try {
-      const insight = await generateFranchiseInsight(franchise, averages);
-      setAiInsight(insight);
-      const latestMonth = franchise.monthlySales?.[franchise.monthlySales.length - 1]?.month || '';
-      try {
-        const saved = await api.saveAiInsight(franchise.id, {
-          salesMonth: latestMonth,
-          riskLevel: franchise.riskLevel || 'NORMAL',
-          summary: franchise.riskSummary || `${franchise.name} AI 운영 인사이트`,
-          content: insight,
-          tags: franchise.alertTags || [],
-        });
-        setAiInsightMeta(saved);
-      } catch (saveError) {
-        console.error('AI 인사이트 저장 실패:', saveError);
-      }
+      const saved = await api.generateAiInsight(franchise.id);
+      setAiInsight(saved.content);
+      setAiInsightMeta(saved);
+      setInsightNote(saved.note || '');
+      setSelectedHistoryId(saved.id);
+      setActiveInsightTab('current');
+      setAiInsightHistories(await api.getAiInsights(franchise.id));
     } catch (err) {
       setAiError(err.message);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleOpenHistory = async () => {
+    setActiveInsightTab('history');
+    setIsInsightModalOpen(true);
+    try {
+      setAiInsightHistories(await api.getAiInsights(franchise.id));
+    } catch (err) {
+      console.error('AI 인사이트 이력 조회 실패:', err);
+    }
+  };
+
+  const handleSelectHistory = (history) => {
+    setSelectedHistoryId(history.id);
+    setAiInsight(history.content);
+    setAiInsightMeta(history);
+    setInsightNote(history.note || '');
+    setActiveInsightTab('current');
+  };
+
+  const handleSaveNote = async () => {
+    if (!aiInsightMeta?.id) return;
+
+    setIsSavingNote(true);
+    try {
+      const updated = await api.updateAiInsightNote(franchise.id, aiInsightMeta.id, insightNote);
+      setAiInsightMeta(updated);
+      setAiInsightHistories((histories) => histories.map(history => (
+        history.id === updated.id ? updated : history
+      )));
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setIsSavingNote(false);
     }
   };
 
@@ -311,6 +352,17 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
                 <Maximize2 size={16} strokeWidth={2.2} />
               </button>
             )}
+            {aiInsightHistories.length > 0 && (
+              <button
+                type="button"
+                onClick={handleOpenHistory}
+                className="icon-button"
+                aria-label="AI 인사이트 이력 보기"
+                title="AI 인사이트 이력 보기"
+              >
+                <History size={16} strokeWidth={2.2} />
+              </button>
+            )}
             {currentUser?.permissions?.canUseAI !== false && (
               <button 
                 onClick={handleGenerateInsight} 
@@ -377,8 +429,61 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
               <X size={18} strokeWidth={2.2} />
             </button>
           </div>
+          <div className="insight-modal-tabs" role="tablist" aria-label="AI 인사이트 보기">
+            <button
+              type="button"
+              className={activeInsightTab === 'current' ? 'active' : ''}
+              onClick={() => setActiveInsightTab('current')}
+            >
+              현재 분석
+            </button>
+            <button
+              type="button"
+              className={activeInsightTab === 'history' ? 'active' : ''}
+              onClick={() => setActiveInsightTab('history')}
+            >
+              이력 {aiInsightHistories.length}
+            </button>
+          </div>
           <div className="insight-modal-body">
-            <AiInsightMarkdown content={aiInsight} />
+            {activeInsightTab === 'current' ? (
+              <>
+                <AiInsightMarkdown content={aiInsight} />
+                {aiInsightMeta && (
+                  <div className="insight-note-box">
+                    <label htmlFor="ai-insight-note">담당자 메모</label>
+                    <textarea
+                      id="ai-insight-note"
+                      value={insightNote}
+                      onChange={(event) => setInsightNote(event.target.value)}
+                      placeholder="확인한 내용이나 후속 조치 메모를 남겨주세요."
+                    />
+                    <button type="button" onClick={handleSaveNote} disabled={isSavingNote}>
+                      <Save size={15} strokeWidth={2.2} />
+                      {isSavingNote ? '저장 중...' : '메모 저장'}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="insight-history-list">
+                {aiInsightHistories.map((history) => (
+                  <button
+                    type="button"
+                    key={history.id}
+                    className={selectedHistoryId === history.id ? 'active' : ''}
+                    onClick={() => handleSelectHistory(history)}
+                  >
+                    <div className="insight-history-row">
+                      <strong>{history.salesMonth}</strong>
+                      <span>{history.createdByName || history.createdBy}</span>
+                    </div>
+                    <p>{history.summary}</p>
+                    {history.note && <em>메모 있음</em>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>

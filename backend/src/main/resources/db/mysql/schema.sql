@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS ai_insight_histories (
     risk_level VARCHAR(20) NOT NULL,
     summary VARCHAR(500) NOT NULL,
     content TEXT NOT NULL,
+    note TEXT,
     tags VARCHAR(255),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),

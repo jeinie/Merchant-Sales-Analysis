@@ -31,7 +31,10 @@ public interface FranchiseDataStore {
             String riskLevel,
             String summary,
             String content,
+            String note,
             List<String> tags);
+
+    AiInsightHistory updateAiInsightNote(Long insightId, String franchiseId, String note);
 
     void assignManager(String franchiseId, String managerId);
 

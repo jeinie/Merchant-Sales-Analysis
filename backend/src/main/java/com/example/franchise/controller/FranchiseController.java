@@ -5,6 +5,7 @@ import com.example.franchise.domain.AiInsightHistory;
 import com.example.franchise.domain.Franchise;
 import com.example.franchise.domain.FranchiseAlert;
 import com.example.franchise.domain.User;
+import com.example.franchise.service.AiInsightGenerationService;
 import com.example.franchise.service.FranchiseDataStore;
 import com.example.franchise.service.FranchiseRiskService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,10 +28,15 @@ public class FranchiseController {
 
     private final FranchiseDataStore dataStore;
     private final FranchiseRiskService riskService;
+    private final AiInsightGenerationService aiInsightGenerationService;
 
-    public FranchiseController(FranchiseDataStore dataStore, FranchiseRiskService riskService) {
+    public FranchiseController(
+            FranchiseDataStore dataStore,
+            FranchiseRiskService riskService,
+            AiInsightGenerationService aiInsightGenerationService) {
         this.dataStore = dataStore;
         this.riskService = riskService;
+        this.aiInsightGenerationService = aiInsightGenerationService;
     }
 
     @GetMapping("/users")
@@ -110,8 +116,68 @@ public class FranchiseController {
                 riskLevel,
                 summary.length() > 500 ? summary.substring(0, 500) : summary,
                 content,
+                stringValue(payload.get("note")),
                 tags);
         return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/franchises/{franchiseId}/ai-insights/generate")
+    public ResponseEntity<?> generateAiInsight(
+            HttpServletRequest request,
+            @org.springframework.web.bind.annotation.PathVariable String franchiseId) {
+        User user = currentUser(request);
+        Franchise franchise = findAccessibleFranchise(request, franchiseId);
+        if (franchise == null) {
+            return forbidden();
+        }
+
+        if (user.getPermissions() != null && Boolean.FALSE.equals(user.getPermissions().get("canUseAI"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "AI 분석 권한이 필요합니다."));
+        }
+
+        if (franchise.getMonthlySales() == null || franchise.getMonthlySales().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "AI 분석에 필요한 매출 데이터가 없습니다."));
+        }
+
+        try {
+            String content = aiInsightGenerationService.generate(franchise, dataStore.getAverages());
+            String salesMonth = franchise.getMonthlySales().get(franchise.getMonthlySales().size() - 1).getMonth();
+            AiInsightHistory saved = dataStore.saveAiInsight(
+                    franchiseId,
+                    user.getId(),
+                    salesMonth,
+                    fallback(franchise.getRiskLevel(), "NORMAL"),
+                    truncate(fallback(franchise.getRiskSummary(), franchise.getName() + " AI 운영 인사이트"), 500),
+                    content,
+                    "",
+                    franchise.getAlertTags() == null ? List.of() : franchise.getAlertTags());
+            return ResponseEntity.ok(saved);
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/franchises/{franchiseId}/ai-insights/{insightId}/note")
+    public ResponseEntity<?> updateAiInsightNote(
+            HttpServletRequest request,
+            @org.springframework.web.bind.annotation.PathVariable String franchiseId,
+            @org.springframework.web.bind.annotation.PathVariable Long insightId,
+            @RequestBody Map<String, Object> payload) {
+        if (!canAccessFranchise(request, franchiseId)) {
+            return forbidden();
+        }
+
+        try {
+            AiInsightHistory updated = dataStore.updateAiInsightNote(
+                    insightId,
+                    franchiseId,
+                    stringValue(payload.get("note")));
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
     }
 
     @GetMapping("/averages")
@@ -180,13 +246,19 @@ public class FranchiseController {
     }
 
     private boolean canAccessFranchise(HttpServletRequest request, String franchiseId) {
+        return findAccessibleFranchise(request, franchiseId) != null;
+    }
+
+    private Franchise findAccessibleFranchise(HttpServletRequest request, String franchiseId) {
         User user = currentUser(request);
         if (user == null || franchiseId == null || franchiseId.isBlank()) {
-            return false;
+            return null;
         }
 
-        return dataStore.getFranchises(user.getId(), user.getRole()).stream()
-                .anyMatch(franchise -> franchiseId.equals(franchise.getId()));
+        return riskService.enrich(dataStore.getFranchises(user.getId(), user.getRole())).stream()
+                .filter(franchise -> franchiseId.equals(franchise.getId()))
+                .findFirst()
+                .orElse(null);
     }
 
     private String stringValue(Object value) {
@@ -203,6 +275,18 @@ public class FranchiseController {
                 .map(String::trim)
                 .filter(item -> !item.isBlank())
                 .toList();
+    }
+
+    private String fallback(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.length() > maxLength ? value.substring(0, maxLength) : value;
     }
 
     private ResponseEntity<?> forbidden() {

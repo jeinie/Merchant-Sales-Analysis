@@ -140,6 +140,19 @@ export const api = {
     });
   },
 
+  async generateAiInsight(franchiseId) {
+    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights/generate`, {
+      method: 'POST',
+    });
+  },
+
+  async updateAiInsightNote(franchiseId, insightId, note) {
+    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights/${encodeURIComponent(insightId)}/note`, {
+      method: 'POST',
+      body: { note },
+    });
+  },
+
   async getAdminUsers() {
     return request('/admin/users');
   },

@@ -12,6 +12,7 @@ public class AiInsightHistory {
     private String riskLevel;
     private String summary;
     private String content;
+    private String note;
     private List<String> tags;
     private Instant createdAt;
 
@@ -77,6 +78,14 @@ public class AiInsightHistory {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
     }
 
     public List<String> getTags() {

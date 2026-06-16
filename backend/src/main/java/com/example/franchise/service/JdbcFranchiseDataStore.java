@@ -4,8 +4,11 @@ import com.example.franchise.domain.AiInsightHistory;
 import com.example.franchise.domain.Franchise;
 import com.example.franchise.domain.MonthlySales;
 import com.example.franchise.domain.User;
+import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -37,6 +40,38 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
         this.jdbcTemplate = jdbcTemplate;
         this.namedJdbcTemplate = namedJdbcTemplate;
         this.passwordHasher = passwordHasher;
+    }
+
+    @PostConstruct
+    void ensureAiInsightSchema() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS ai_insight_histories (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    franchise_id VARCHAR(20) NOT NULL,
+                    created_by VARCHAR(64) NOT NULL,
+                    sales_month CHAR(7) NOT NULL,
+                    risk_level VARCHAR(20) NOT NULL,
+                    summary VARCHAR(500) NOT NULL,
+                    content TEXT NOT NULL,
+                    note TEXT,
+                    tags VARCHAR(255),
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_ai_insight_franchise_month (franchise_id, sales_month),
+                    CONSTRAINT fk_ai_insight_franchise
+                        FOREIGN KEY (franchise_id) REFERENCES franchises (id)
+                        ON DELETE CASCADE,
+                    CONSTRAINT fk_ai_insight_user
+                        FOREIGN KEY (created_by) REFERENCES users (id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE ai_insight_histories ADD COLUMN note TEXT");
+        } catch (BadSqlGrammarException | DuplicateKeyException ex) {
+            // Existing databases may already have the column; the table definition above handles fresh schemas.
+        }
     }
 
     @Override
@@ -107,7 +142,7 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
     public List<AiInsightHistory> getAiInsights(String franchiseId) {
         return jdbcTemplate.query("""
                         SELECT h.id, h.franchise_id, h.created_by, u.name AS created_by_name,
-                               h.sales_month, h.risk_level, h.summary, h.content, h.tags, h.created_at
+                               h.sales_month, h.risk_level, h.summary, h.content, h.note, h.tags, h.created_at
                         FROM ai_insight_histories h
                         JOIN users u ON u.id = h.created_by
                         WHERE h.franchise_id = ?
@@ -122,7 +157,7 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
         try {
             return jdbcTemplate.queryForObject("""
                             SELECT h.id, h.franchise_id, h.created_by, u.name AS created_by_name,
-                                   h.sales_month, h.risk_level, h.summary, h.content, h.tags, h.created_at
+                                   h.sales_month, h.risk_level, h.summary, h.content, h.note, h.tags, h.created_at
                             FROM ai_insight_histories h
                             JOIN users u ON u.id = h.created_by
                             WHERE h.franchise_id = ?
@@ -144,11 +179,12 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
             String riskLevel,
             String summary,
             String content,
+            String note,
             List<String> tags) {
         jdbcTemplate.update("""
                         INSERT INTO ai_insight_histories
-                            (franchise_id, created_by, sales_month, risk_level, summary, content, tags)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                            (franchise_id, created_by, sales_month, risk_level, summary, content, note, tags)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 franchiseId,
                 createdBy,
@@ -156,9 +192,37 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
                 riskLevel,
                 summary,
                 content,
+                note,
                 String.join(",", tags));
 
         return getLatestAiInsight(franchiseId);
+    }
+
+    @Override
+    public AiInsightHistory updateAiInsightNote(Long insightId, String franchiseId, String note) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE ai_insight_histories
+                        SET note = ?
+                        WHERE id = ? AND franchise_id = ?
+                        """,
+                note,
+                insightId,
+                franchiseId);
+
+        if (updated == 0) {
+            throw new IllegalArgumentException("존재하지 않는 AI 인사이트입니다.");
+        }
+
+        return jdbcTemplate.queryForObject("""
+                        SELECT h.id, h.franchise_id, h.created_by, u.name AS created_by_name,
+                               h.sales_month, h.risk_level, h.summary, h.content, h.note, h.tags, h.created_at
+                        FROM ai_insight_histories h
+                        JOIN users u ON u.id = h.created_by
+                        WHERE h.id = ? AND h.franchise_id = ?
+                        """,
+                this::mapAiInsightHistory,
+                insightId,
+                franchiseId);
     }
 
     @Override
@@ -338,6 +402,7 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
         history.setRiskLevel(rs.getString("risk_level"));
         history.setSummary(rs.getString("summary"));
         history.setContent(rs.getString("content"));
+        history.setNote(rs.getString("note"));
         history.setTags(splitTags(rs.getString("tags")));
 
         Timestamp createdAt = rs.getTimestamp("created_at");
