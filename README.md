@@ -337,6 +337,7 @@ $env:DB_INIT_MODE="never"
 ```
 
 SQL 파일은 `backend/src/main/resources/db/mysql/schema.sql`, `backend/src/main/resources/db/mysql/data.sql`에 있습니다. 초기 계정 비밀번호는 `1234`입니다.
+이미 생성된 MySQL 테이블에 컬럼/테이블 코멘트만 반영할 때는 `backend/src/main/resources/db/mysql/apply-column-comments.sql`을 한 번 실행합니다.
 
 #### 자주 발생하는 오류
 
