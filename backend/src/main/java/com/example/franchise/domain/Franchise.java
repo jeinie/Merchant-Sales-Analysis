@@ -15,6 +15,9 @@ public class Franchise {
     private Instant geocodedAt;
     private String geocodeSource;
     private String locationNote;
+    private String operationalStatus;
+    private Instant closedAt;
+    private String closureNote;
     private String riskLevel;
     private Integer priorityScore;
     private String riskSummary;
@@ -110,6 +113,30 @@ public class Franchise {
 
     public void setLocationNote(String locationNote) {
         this.locationNote = locationNote;
+    }
+
+    public String getOperationalStatus() {
+        return operationalStatus;
+    }
+
+    public void setOperationalStatus(String operationalStatus) {
+        this.operationalStatus = operationalStatus;
+    }
+
+    public Instant getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(Instant closedAt) {
+        this.closedAt = closedAt;
+    }
+
+    public String getClosureNote() {
+        return closureNote;
+    }
+
+    public void setClosureNote(String closureNote) {
+        this.closureNote = closureNote;
     }
 
     public String getRiskLevel() {

@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -223,10 +224,80 @@ public class FranchiseController {
         }
     }
 
+    @PostMapping("/admin/franchises")
+    public ResponseEntity<?> createFranchise(HttpServletRequest request, @RequestBody Map<String, Object> payload) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        String name = stringValue(payload.get("name"));
+        String industry = stringValue(payload.get("industry"));
+        String region = stringValue(payload.get("region"));
+        String address = stringValue(payload.get("address"));
+        String managerId = stringValue(payload.get("managerId"));
+        String locationStatus = fallback(stringValue(payload.get("locationStatus")), "UNVERIFIED").toUpperCase();
+
+        if (name.isBlank() || industry.isBlank() || region.isBlank() || address.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "가맹점명, 업종, 지역, 주소는 필수입니다."));
+        }
+        if (!LOCATION_STATUSES.contains(locationStatus)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "지원하지 않는 위치 상태입니다."));
+        }
+
+        Double latitude;
+        Double longitude;
+        try {
+            latitude = nullableDouble(payload.get("latitude"));
+            longitude = nullableDouble(payload.get("longitude"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+
+        ResponseEntity<?> coordinateError = validateCoordinates(latitude, longitude, locationStatus);
+        if (coordinateError != null) {
+            return coordinateError;
+        }
+
+        try {
+            Franchise saved = dataStore.createFranchise(
+                    truncate(name, 120),
+                    truncate(industry, 60),
+                    truncate(region, 100),
+                    truncate(address, 255),
+                    latitude,
+                    longitude,
+                    locationStatus,
+                    truncate(stringValue(payload.get("geocodeSource")), 50),
+                    truncate(stringValue(payload.get("locationNote")), 255),
+                    managerId);
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/franchises/{franchiseId}/close")
+    public ResponseEntity<?> closeFranchise(
+            HttpServletRequest request,
+            @PathVariable String franchiseId,
+            @RequestBody(required = false) Map<String, Object> payload) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        try {
+            String closureNote = payload == null ? "" : stringValue(payload.get("closureNote"));
+            dataStore.closeFranchise(franchiseId, truncate(closureNote, 255));
+            return ResponseEntity.ok(Map.of("message", "가맹점이 폐점 처리되었습니다."));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
     @PostMapping("/admin/franchises/{franchiseId}/location")
     public ResponseEntity<?> updateFranchiseLocation(
             HttpServletRequest request,
-            @org.springframework.web.bind.annotation.PathVariable String franchiseId,
+            @PathVariable String franchiseId,
             @RequestBody Map<String, Object> payload) {
         if (!isAdmin(request)) {
             return forbidden();
@@ -245,18 +316,9 @@ public class FranchiseController {
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
-        if ((latitude == null) != (longitude == null)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "위도와 경도는 함께 입력해야 합니다."));
-        }
-        if (latitude != null && (latitude < -90 || latitude > 90)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "위도는 -90에서 90 사이여야 합니다."));
-        }
-        if (longitude != null && (longitude < -180 || longitude > 180)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "경도는 -180에서 180 사이여야 합니다."));
-        }
-        if (("GEOCODED".equals(locationStatus) || "VERIFIED".equals(locationStatus) || "MANUAL".equals(locationStatus))
-                && (latitude == null || longitude == null)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "좌표 확인 상태에는 위도와 경도가 필요합니다."));
+        ResponseEntity<?> coordinateError = validateCoordinates(latitude, longitude, locationStatus);
+        if (coordinateError != null) {
+            return coordinateError;
         }
 
         try {
@@ -349,6 +411,23 @@ public class FranchiseController {
         } catch (NumberFormatException ex) {
             throw new IllegalArgumentException("숫자 형식이 올바르지 않습니다.");
         }
+    }
+
+    private ResponseEntity<?> validateCoordinates(Double latitude, Double longitude, String locationStatus) {
+        if ((latitude == null) != (longitude == null)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "위도와 경도는 함께 입력해야 합니다."));
+        }
+        if (latitude != null && (latitude < -90 || latitude > 90)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "위도는 -90에서 90 사이여야 합니다."));
+        }
+        if (longitude != null && (longitude < -180 || longitude > 180)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "경도는 -180에서 180 사이여야 합니다."));
+        }
+        if (("GEOCODED".equals(locationStatus) || "VERIFIED".equals(locationStatus) || "MANUAL".equals(locationStatus))
+                && (latitude == null || longitude == null)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "좌표 확인 상태에는 위도와 경도가 필요합니다."));
+        }
+        return null;
     }
 
     private String fallback(String value, String fallback) {

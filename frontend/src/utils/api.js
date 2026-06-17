@@ -157,6 +157,20 @@ export const api = {
     return request('/admin/users');
   },
 
+  async createFranchise(payload) {
+    return request('/admin/franchises', {
+      method: 'POST',
+      body: payload,
+    });
+  },
+
+  async closeFranchise(franchiseId, closureNote = '') {
+    return request(`/admin/franchises/${encodeURIComponent(franchiseId)}/close`, {
+      method: 'POST',
+      body: { closureNote },
+    });
+  },
+
   async assignManager(franchiseId, managerId) {
     return request('/admin/assign-manager', {
       method: 'POST',

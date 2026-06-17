@@ -36,6 +36,20 @@ public interface FranchiseDataStore {
 
     AiInsightHistory updateAiInsightNote(Long insightId, String franchiseId, String note);
 
+    Franchise createFranchise(
+            String name,
+            String industry,
+            String region,
+            String address,
+            Double latitude,
+            Double longitude,
+            String locationStatus,
+            String geocodeSource,
+            String locationNote,
+            String managerId);
+
+    void closeFranchise(String franchiseId, String closureNote);
+
     void assignManager(String franchiseId, String managerId);
 
     Franchise updateFranchiseLocation(

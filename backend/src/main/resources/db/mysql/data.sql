@@ -8,24 +8,30 @@ ON DUPLICATE KEY UPDATE
     role = VALUES(role),
     can_use_ai = VALUES(can_use_ai);
 
-INSERT INTO franchises (id, name, industry, region, address, latitude, longitude) VALUES
-    ('F001', '강남역 1호점', '카페', '서울 강남구', '서울 강남구 강남대로 396', 37.4979000, 127.0276000),
-    ('F002', '홍대입구점', '음식점', '서울 마포구', '서울 마포구 양화로 160', 37.5572000, 126.9245000),
-    ('F003', '여의도 금융타운점', '카페', '서울 영등포구', '서울 영등포구 여의대로 108', 37.5259000, 126.9286000),
-    ('F004', '성수 카페거리점', '카페', '서울 성동구', '서울 성동구 연무장길 14', 37.5438000, 127.0565000),
-    ('F005', '테헤란 점심특화점', '음식점', '서울 강남구', '서울 강남구 테헤란로 152', 37.5013000, 127.0396000),
-    ('F006', '합정 브런치점', '음식점', '서울 마포구', '서울 마포구 독막로 10', 37.5496000, 126.9139000),
-    ('F007', '샛강 테이크아웃점', '카페', '서울 영등포구', '서울 영등포구 의사당대로 83', 37.5184000, 126.9317000),
-    ('F008', '성수 로스터리점', '카페', '서울 성동구', '서울 성동구 성수이로 87', 37.5446000, 127.0557000),
-    ('F009', '상암 오피스푸드점', '음식점', '서울 마포구', '서울 마포구 월드컵북로 396', 37.5796000, 126.8896000),
-    ('F010', '선릉 라운지카페', '카페', '서울 강남구', '서울 강남구 선릉로 428', 37.5045000, 127.0490000)
+INSERT INTO franchises (id, name, industry, region, address, latitude, longitude, location_status, geocode_source, location_note, operational_status) VALUES
+    ('F001', '강남역 1호점', '카페', '서울 강남구', '서울 강남구 강남대로 396', 37.4979000, 127.0276000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F002', '홍대입구점', '음식점', '서울 마포구', '서울 마포구 양화로 160', 37.5572000, 126.9245000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F003', '여의도 금융타운점', '카페', '서울 영등포구', '서울 영등포구 여의대로 108', 37.5259000, 126.9286000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F004', '성수 카페거리점', '카페', '서울 성동구', '서울 성동구 연무장길 14', 37.5438000, 127.0565000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F005', '테헤란 점심특화점', '음식점', '서울 강남구', '서울 강남구 테헤란로 152', 37.5013000, 127.0396000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F006', '합정 브런치점', '음식점', '서울 마포구', '서울 마포구 독막로 10', 37.5496000, 126.9139000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F007', '샛강 테이크아웃점', '카페', '서울 영등포구', '서울 영등포구 의사당대로 83', 37.5184000, 126.9317000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F008', '성수 로스터리점', '카페', '서울 성동구', '서울 성동구 성수이로 87', 37.5446000, 127.0557000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F009', '상암 오피스푸드점', '음식점', '서울 마포구', '서울 마포구 월드컵북로 396', 37.5796000, 126.8896000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE'),
+    ('F010', '선릉 라운지카페', '카페', '서울 강남구', '서울 강남구 선릉로 428', 37.5045000, 127.0490000, 'GEOCODED', 'SEED_DATA', '초기 테스트 데이터 좌표', 'ACTIVE')
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     industry = VALUES(industry),
     region = VALUES(region),
     address = VALUES(address),
     latitude = VALUES(latitude),
-    longitude = VALUES(longitude);
+    longitude = VALUES(longitude),
+    location_status = VALUES(location_status),
+    geocode_source = VALUES(geocode_source),
+    location_note = VALUES(location_note),
+    operational_status = VALUES(operational_status),
+    closed_at = NULL,
+    closure_note = NULL;
 
 INSERT INTO monthly_sales (id, franchise_id, sales_month, sales, tx_count, avg_ticket) VALUES
     (1, 'F001', '2023-01', 15000000, 1500, 10000),

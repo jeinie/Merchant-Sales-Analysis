@@ -25,6 +25,9 @@ ALTER TABLE franchises
     MODIFY geocoded_at TIMESTAMP NULL COMMENT '주소 기반 좌표 산출 시각',
     MODIFY geocode_source VARCHAR(50) COMMENT '좌표 산출 출처',
     MODIFY location_note VARCHAR(255) COMMENT '위치 검증 또는 보정 메모',
+    MODIFY operational_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '가맹점 운영 상태: ACTIVE 또는 CLOSED',
+    MODIFY closed_at TIMESTAMP NULL COMMENT '폐점 처리 시각',
+    MODIFY closure_note VARCHAR(255) COMMENT '폐점 처리 사유 또는 메모',
     MODIFY created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '가맹점 정보 생성 시각',
     MODIFY updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '가맹점 정보 최종 수정 시각';
 

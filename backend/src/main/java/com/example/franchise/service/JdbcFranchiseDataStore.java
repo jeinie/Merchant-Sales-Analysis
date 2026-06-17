@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -93,6 +94,32 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
                 "franchises",
                 "location_note",
                 "ALTER TABLE franchises ADD COLUMN location_note VARCHAR(255) COMMENT '위치 검증 또는 보정 메모'");
+        addColumnIfMissing(
+                "franchises",
+                "operational_status",
+                "ALTER TABLE franchises ADD COLUMN operational_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '가맹점 운영 상태: ACTIVE 또는 CLOSED'");
+        addColumnIfMissing(
+                "franchises",
+                "closed_at",
+                "ALTER TABLE franchises ADD COLUMN closed_at TIMESTAMP NULL COMMENT '폐점 처리 시각'");
+        addColumnIfMissing(
+                "franchises",
+                "closure_note",
+                "ALTER TABLE franchises ADD COLUMN closure_note VARCHAR(255) COMMENT '폐점 처리 사유 또는 메모'");
+        backfillExistingFranchiseLocationStatus();
+    }
+
+    private void backfillExistingFranchiseLocationStatus() {
+        jdbcTemplate.update("""
+                UPDATE franchises
+                SET location_status = 'GEOCODED',
+                    geocode_source = COALESCE(geocode_source, 'SEED_DATA'),
+                    location_note = COALESCE(location_note, '기존 가맹점 좌표 데이터를 위치 상태로 보정했습니다.'),
+                    geocoded_at = COALESCE(geocoded_at, CURRENT_TIMESTAMP)
+                WHERE latitude IS NOT NULL
+                  AND longitude IS NOT NULL
+                  AND (location_status IS NULL OR location_status = 'UNVERIFIED')
+                """);
     }
 
     private void addColumnIfMissing(String tableName, String columnName, String alterSql) {
@@ -265,8 +292,80 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
 
     @Override
     @Transactional
+    public Franchise createFranchise(
+            String name,
+            String industry,
+            String region,
+            String address,
+            Double latitude,
+            Double longitude,
+            String locationStatus,
+            String geocodeSource,
+            String locationNote,
+            String managerId) {
+        if (managerId != null && !managerId.isBlank() && !existsSalesUser(managerId)) {
+            throw new IllegalArgumentException("존재하지 않는 영업사원입니다.");
+        }
+
+        String franchiseId = nextFranchiseId();
+        jdbcTemplate.update("""
+                        INSERT INTO franchises
+                            (id, name, industry, region, address, latitude, longitude,
+                             location_status, geocoded_at, geocode_source, location_note,
+                             operational_status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END, ?, ?, 'ACTIVE')
+                        """,
+                franchiseId,
+                name,
+                industry,
+                region,
+                address,
+                latitude,
+                longitude,
+                locationStatus,
+                latitude,
+                geocodeSource,
+                locationNote);
+
+        if (managerId != null && !managerId.isBlank()) {
+            jdbcTemplate.update("""
+                            INSERT INTO user_franchise_assignments (user_id, franchise_id)
+                            VALUES (?, ?)
+                            """,
+                    managerId,
+                    franchiseId);
+        }
+
+        return loadFranchiseById(franchiseId);
+    }
+
+    @Override
+    @Transactional
+    public void closeFranchise(String franchiseId, String closureNote) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE franchises
+                        SET operational_status = 'CLOSED',
+                            closed_at = CURRENT_TIMESTAMP,
+                            closure_note = ?
+                        WHERE id = ?
+                          AND operational_status = 'ACTIVE'
+                        """,
+                closureNote,
+                franchiseId);
+
+        if (updated == 0) {
+            throw new IllegalArgumentException("존재하지 않거나 이미 폐점 처리된 가맹점입니다.");
+        }
+
+        jdbcTemplate.update(
+                "DELETE FROM user_franchise_assignments WHERE franchise_id = ?",
+                franchiseId);
+    }
+
+    @Override
+    @Transactional
     public void assignManager(String franchiseId, String managerId) {
-        if (!existsById("franchises", franchiseId)) {
+        if (!existsActiveFranchise(franchiseId)) {
             throw new IllegalArgumentException("존재하지 않는 가맹점입니다.");
         }
 
@@ -305,6 +404,7 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
                             geocode_source = ?,
                             location_note = ?
                         WHERE id = ?
+                          AND operational_status = 'ACTIVE'
                         """,
                 latitude,
                 longitude,
@@ -315,7 +415,7 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
                 franchiseId);
 
         if (updated == 0) {
-            throw new IllegalArgumentException("존재하지 않는 가맹점입니다.");
+            throw new IllegalArgumentException("존재하지 않거나 폐점 처리된 가맹점입니다.");
         }
 
         return loadFranchiseById(franchiseId);
@@ -350,8 +450,10 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
     private List<Franchise> loadAllFranchises() {
         List<Franchise> franchises = jdbcTemplate.query("""
                 SELECT id, name, industry, region, address, latitude, longitude,
-                       location_status, geocoded_at, geocode_source, location_note
+                       location_status, geocoded_at, geocode_source, location_note,
+                       operational_status, closed_at, closure_note
                 FROM franchises
+                WHERE operational_status = 'ACTIVE'
                 ORDER BY id
                 """, this::mapFranchise);
         return attachMonthlySales(franchises);
@@ -360,7 +462,8 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
     private Franchise loadFranchiseById(String franchiseId) {
         Franchise franchise = jdbcTemplate.queryForObject("""
                         SELECT id, name, industry, region, address, latitude, longitude,
-                               location_status, geocoded_at, geocode_source, location_note
+                               location_status, geocoded_at, geocode_source, location_note,
+                               operational_status, closed_at, closure_note
                         FROM franchises
                         WHERE id = ?
                         """,
@@ -372,9 +475,11 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
     private List<Franchise> loadFranchisesByIds(List<String> franchiseIds) {
         List<Franchise> franchises = namedJdbcTemplate.query("""
                         SELECT id, name, industry, region, address, latitude, longitude,
-                               location_status, geocoded_at, geocode_source, location_note
+                               location_status, geocoded_at, geocode_source, location_note,
+                               operational_status, closed_at, closure_note
                         FROM franchises
                         WHERE id IN (:ids)
+                          AND operational_status = 'ACTIVE'
                         ORDER BY id
                         """,
                 Map.of("ids", franchiseIds),
@@ -418,15 +523,17 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
 
         return jdbcTemplate.queryForList("""
                 SELECT franchise_id
-                FROM user_franchise_assignments
-                WHERE user_id = ?
-                ORDER BY franchise_id
+                FROM user_franchise_assignments a
+                JOIN franchises f ON f.id = a.franchise_id
+                WHERE a.user_id = ?
+                  AND f.operational_status = 'ACTIVE'
+                ORDER BY a.franchise_id
                 """, String.class, userId);
     }
 
-    private boolean existsById(String tableName, String id) {
+    private boolean existsActiveFranchise(String id) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM " + tableName + " WHERE id = ?",
+                "SELECT COUNT(*) FROM franchises WHERE id = ? AND operational_status = 'ACTIVE'",
                 Integer.class,
                 id);
         return count != null && count > 0;
@@ -441,6 +548,15 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
                 Integer.class,
                 userId);
         return count != null && count > 0;
+    }
+
+    private String nextFranchiseId() {
+        List<String> ids = jdbcTemplate.queryForList("SELECT id FROM franchises", String.class);
+        OptionalInt maxId = ids.stream()
+                .filter(id -> id != null && id.matches("F\\d+"))
+                .mapToInt(id -> Integer.parseInt(id.substring(1)))
+                .max();
+        return "F%03d".formatted(maxId.orElse(0) + 1);
     }
 
     private User mapStoredUser(ResultSet rs, int rowNum) throws SQLException {
@@ -467,6 +583,10 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
         franchise.setGeocodedAt(geocodedAt == null ? null : geocodedAt.toInstant());
         franchise.setGeocodeSource(rs.getString("geocode_source"));
         franchise.setLocationNote(rs.getString("location_note"));
+        franchise.setOperationalStatus(rs.getString("operational_status"));
+        Timestamp closedAt = rs.getTimestamp("closed_at");
+        franchise.setClosedAt(closedAt == null ? null : closedAt.toInstant());
+        franchise.setClosureNote(rs.getString("closure_note"));
         franchise.setMonthlySales(new ArrayList<>());
         return franchise;
     }

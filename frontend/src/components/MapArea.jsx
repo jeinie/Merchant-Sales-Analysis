@@ -49,7 +49,7 @@ const loadKakaoMaps = () => new Promise((resolve, reject) => {
 
   const script = document.createElement('script');
   script.id = KAKAO_MAP_SDK_ID;
-  script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(KAKAO_MAP_API_KEY)}&libraries=clusterer&autoload=false`;
+  script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(KAKAO_MAP_API_KEY)}&libraries=services,clusterer&autoload=false`;
   script.async = true;
   script.onload = handleLoad;
   script.onerror = handleError;
