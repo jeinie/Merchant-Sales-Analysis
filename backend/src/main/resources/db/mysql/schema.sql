@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS franchises (
     address VARCHAR(255) NOT NULL COMMENT '가맹점 주소',
     latitude DECIMAL(10, 7) COMMENT '지도 표시용 위도',
     longitude DECIMAL(10, 7) COMMENT '지도 표시용 경도',
+    location_status VARCHAR(20) NOT NULL DEFAULT 'UNVERIFIED' COMMENT '위치 좌표 검증 상태',
+    geocoded_at TIMESTAMP NULL COMMENT '주소 기반 좌표 산출 시각',
+    geocode_source VARCHAR(50) COMMENT '좌표 산출 출처',
+    location_note VARCHAR(255) COMMENT '위치 검증 또는 보정 메모',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '가맹점 정보 생성 시각',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '가맹점 정보 최종 수정 시각',
     PRIMARY KEY (id)

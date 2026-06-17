@@ -20,11 +20,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
 public class FranchiseController {
+    private static final Set<String> LOCATION_STATUSES = Set.of(
+            "UNVERIFIED",
+            "GEOCODED",
+            "VERIFIED",
+            "FAILED",
+            "MANUAL");
+
 
     private final FranchiseDataStore dataStore;
     private final FranchiseRiskService riskService;
@@ -215,6 +223,56 @@ public class FranchiseController {
         }
     }
 
+    @PostMapping("/admin/franchises/{franchiseId}/location")
+    public ResponseEntity<?> updateFranchiseLocation(
+            HttpServletRequest request,
+            @org.springframework.web.bind.annotation.PathVariable String franchiseId,
+            @RequestBody Map<String, Object> payload) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        String locationStatus = fallback(stringValue(payload.get("locationStatus")), "UNVERIFIED").toUpperCase();
+        if (!LOCATION_STATUSES.contains(locationStatus)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "지원하지 않는 위치 상태입니다."));
+        }
+
+        Double latitude;
+        Double longitude;
+        try {
+            latitude = nullableDouble(payload.get("latitude"));
+            longitude = nullableDouble(payload.get("longitude"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+        if ((latitude == null) != (longitude == null)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "위도와 경도는 함께 입력해야 합니다."));
+        }
+        if (latitude != null && (latitude < -90 || latitude > 90)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "위도는 -90에서 90 사이여야 합니다."));
+        }
+        if (longitude != null && (longitude < -180 || longitude > 180)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "경도는 -180에서 180 사이여야 합니다."));
+        }
+        if (("GEOCODED".equals(locationStatus) || "VERIFIED".equals(locationStatus) || "MANUAL".equals(locationStatus))
+                && (latitude == null || longitude == null)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "좌표 확인 상태에는 위도와 경도가 필요합니다."));
+        }
+
+        try {
+            Franchise updated = dataStore.updateFranchiseLocation(
+                    franchiseId,
+                    latitude,
+                    longitude,
+                    locationStatus,
+                    truncate(stringValue(payload.get("geocodeSource")), 50),
+                    truncate(stringValue(payload.get("locationNote")), 255));
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
     @PostMapping("/admin/toggle-ai")
     public ResponseEntity<?> toggleAi(HttpServletRequest request, @RequestBody Map<String, Object> payload) {
         if (!isAdmin(request)) {
@@ -275,6 +333,22 @@ public class FranchiseController {
                 .map(String::trim)
                 .filter(item -> !item.isBlank())
                 .toList();
+    }
+
+    private Double nullableDouble(Object value) {
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("숫자 형식이 올바르지 않습니다.");
+        }
     }
 
     private String fallback(String value, String fallback) {

@@ -1,5 +1,6 @@
 package com.example.franchise.domain;
 
+import java.time.Instant;
 import java.util.List;
 
 public class Franchise {
@@ -10,6 +11,10 @@ public class Franchise {
     private String address;
     private Double latitude;
     private Double longitude;
+    private String locationStatus;
+    private Instant geocodedAt;
+    private String geocodeSource;
+    private String locationNote;
     private String riskLevel;
     private Integer priorityScore;
     private String riskSummary;
@@ -73,6 +78,38 @@ public class Franchise {
 
     public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+
+    public String getLocationStatus() {
+        return locationStatus;
+    }
+
+    public void setLocationStatus(String locationStatus) {
+        this.locationStatus = locationStatus;
+    }
+
+    public Instant getGeocodedAt() {
+        return geocodedAt;
+    }
+
+    public void setGeocodedAt(Instant geocodedAt) {
+        this.geocodedAt = geocodedAt;
+    }
+
+    public String getGeocodeSource() {
+        return geocodeSource;
+    }
+
+    public void setGeocodeSource(String geocodeSource) {
+        this.geocodeSource = geocodeSource;
+    }
+
+    public String getLocationNote() {
+        return locationNote;
+    }
+
+    public void setLocationNote(String locationNote) {
+        this.locationNote = locationNote;
     }
 
     public String getRiskLevel() {

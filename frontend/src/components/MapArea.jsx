@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const KAKAO_MAP_SDK_ID = 'kakao-map-sdk';
 const KAKAO_MAP_API_KEY = import.meta.env.VITE_KAKAO_MAP_API_KEY;
-const COORDINATE_CACHE_KEY = 'franchiseCoordinateCache';
 
 const TREND_COLORS = {
   up: '#16a34a',
@@ -13,11 +12,6 @@ const TREND_COLORS = {
 const loadKakaoMaps = () => new Promise((resolve, reject) => {
   const resolveAfterLoad = () => {
     window.kakao.maps.load(() => {
-      if (!window.kakao?.maps?.services) {
-        reject(new Error('Kakao Maps services 라이브러리를 불러오지 못했습니다.'));
-        return;
-      }
-
       resolve(window.kakao);
     });
   };
@@ -55,28 +49,12 @@ const loadKakaoMaps = () => new Promise((resolve, reject) => {
 
   const script = document.createElement('script');
   script.id = KAKAO_MAP_SDK_ID;
-  script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(KAKAO_MAP_API_KEY)}&libraries=services,clusterer&autoload=false`;
+  script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(KAKAO_MAP_API_KEY)}&libraries=clusterer&autoload=false`;
   script.async = true;
   script.onload = handleLoad;
   script.onerror = handleError;
   document.head.appendChild(script);
 });
-
-const loadCoordinateCache = () => {
-  try {
-    return JSON.parse(localStorage.getItem(COORDINATE_CACHE_KEY) || '{}');
-  } catch (err) {
-    return {};
-  }
-};
-
-const saveCoordinateCache = (cache) => {
-  try {
-    localStorage.setItem(COORDINATE_CACHE_KEY, JSON.stringify(cache));
-  } catch (err) {
-    // Caching is only an optimization; the map can still geocode without it.
-  }
-};
 
 const toNumber = (value) => {
   const number = Number(value);
@@ -243,7 +221,6 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
   const markersRef = useRef([]);
   const markerRecordsRef = useRef(new Map());
   const clustererRef = useRef(null);
-  const coordinateCacheRef = useRef(loadCoordinateCache());
   const selectedFranchiseIdRef = useRef(selectedFranchiseId);
 
   const [isMapReady, setIsMapReady] = useState(false);
@@ -264,44 +241,6 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
     markerRecordsRef.current = new Map();
-  }, []);
-
-  const resolveCoordinates = useCallback((geocoder, franchise) => {
-    const dataCoordinates = readFranchiseCoordinates(franchise);
-    if (dataCoordinates) {
-      return Promise.resolve(dataCoordinates);
-    }
-
-    const cacheKey = franchise.address || franchise.id;
-    const cachedCoordinates = coordinateCacheRef.current[cacheKey];
-    if (cachedCoordinates) {
-      return Promise.resolve(cachedCoordinates);
-    }
-
-    if (!franchise.address || !geocoder) {
-      return Promise.resolve(null);
-    }
-
-    return new Promise((resolve) => {
-      geocoder.addressSearch(franchise.address, (result, status) => {
-        if (status !== window.kakao.maps.services.Status.OK || !result[0]) {
-          resolve(null);
-          return;
-        }
-
-        const coordinates = {
-          latitude: Number(result[0].y),
-          longitude: Number(result[0].x),
-        };
-
-        coordinateCacheRef.current = {
-          ...coordinateCacheRef.current,
-          [cacheKey]: coordinates,
-        };
-        saveCoordinateCache(coordinateCacheRef.current);
-        resolve(coordinates);
-      });
-    });
   }, []);
 
   const applySelectedMarkerStyle = useCallback((selectedId) => {
@@ -366,7 +305,6 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
     let cancelled = false;
     const kakao = window.kakao;
     const map = mapInstance.current;
-    const geocoder = kakao.maps.services ? new kakao.maps.services.Geocoder() : null;
 
     clearMapObjects();
     setMarkerSummary({ total: franchises.length, unresolved: 0 });
@@ -376,102 +314,98 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
       return;
     }
 
-    Promise.all(franchises.map(async (franchise) => ({
+    const resolved = franchises.map((franchise) => ({
       franchise,
-      coordinates: await resolveCoordinates(geocoder, franchise),
-    }))).then((resolved) => {
-      if (cancelled) return;
+      coordinates: readFranchiseCoordinates(franchise),
+    }));
 
-      const bounds = new kakao.maps.LatLngBounds();
-      const markerRecords = new Map();
-      const markers = [];
-      let unresolved = 0;
+    const bounds = new kakao.maps.LatLngBounds();
+    const markerRecords = new Map();
+    const markers = [];
+    let unresolved = 0;
 
-      resolved.forEach(({ franchise, coordinates }) => {
-        if (!coordinates) {
-          unresolved += 1;
-          return;
-        }
+    resolved.forEach(({ franchise, coordinates }) => {
+      if (!coordinates) {
+        unresolved += 1;
+        return;
+      }
 
-        const stats = getLatestSalesStats(franchise);
-        const color = TREND_COLORS[stats.trend];
-        const baseSize = getMarkerSize(stats.latestSales, salesRange);
-        const position = new kakao.maps.LatLng(coordinates.latitude, coordinates.longitude);
-        const marker = new kakao.maps.Marker({
-          position,
-          title: franchise.name,
-          image: createMarkerImage(kakao, {
-            color,
-            size: baseSize,
-            selected: false,
-          }),
-        });
-        const infoWindow = new kakao.maps.InfoWindow({
-          content: createInfoWindowContent(franchise, stats),
-          zIndex: 20,
-        });
-
-        kakao.maps.event.addListener(marker, 'click', () => {
-          infoWindow.open(map, marker);
-          onMarkerClick(franchise.id);
-        });
-        kakao.maps.event.addListener(marker, 'mouseover', () => {
-          infoWindow.open(map, marker);
-        });
-        kakao.maps.event.addListener(marker, 'mouseout', () => {
-          if (selectedFranchiseIdRef.current !== franchise.id) {
-            infoWindow.close();
-          }
-        });
-
-        markerRecords.set(franchise.id, {
-          marker,
-          infoWindow,
-          position,
+      const stats = getLatestSalesStats(franchise);
+      const color = TREND_COLORS[stats.trend];
+      const baseSize = getMarkerSize(stats.latestSales, salesRange);
+      const position = new kakao.maps.LatLng(coordinates.latitude, coordinates.longitude);
+      const marker = new kakao.maps.Marker({
+        position,
+        title: franchise.name,
+        image: createMarkerImage(kakao, {
           color,
-          baseSize,
-          zIndex: baseSize,
-        });
-        markers.push(marker);
-        bounds.extend(position);
+          size: baseSize,
+          selected: false,
+        }),
+      });
+      const infoWindow = new kakao.maps.InfoWindow({
+        content: createInfoWindowContent(franchise, stats),
+        zIndex: 20,
       });
 
-      markerRecordsRef.current = markerRecords;
-      markersRef.current = markers;
+      kakao.maps.event.addListener(marker, 'click', () => {
+        infoWindow.open(map, marker);
+        onMarkerClick(franchise.id);
+      });
+      kakao.maps.event.addListener(marker, 'mouseover', () => {
+        infoWindow.open(map, marker);
+      });
+      kakao.maps.event.addListener(marker, 'mouseout', () => {
+        if (selectedFranchiseIdRef.current !== franchise.id) {
+          infoWindow.close();
+        }
+      });
 
-      if (kakao.maps.MarkerClusterer) {
-        clustererRef.current = new kakao.maps.MarkerClusterer({
-          map,
-          markers,
-          averageCenter: true,
-          minLevel: 6,
-          calculator: [5, 10, 20],
-          styles: getClusterStyles(),
-        });
-      } else {
-        markers.forEach((marker) => marker.setMap(map));
-      }
-
-      if (markers.length > 1) {
-        map.setBounds(bounds);
-      } else if (markers.length === 1) {
-        map.setCenter(markers[0].getPosition());
-        map.setLevel(5);
-      }
-
-      setMarkerSummary({ total: franchises.length, unresolved });
-      setMarkersVersion((version) => version + 1);
-      applySelectedMarkerStyle(selectedFranchiseIdRef.current);
-    }).catch((err) => {
-      if (!cancelled) {
-        setLoadError(err.message);
-      }
+      markerRecords.set(franchise.id, {
+        marker,
+        infoWindow,
+        position,
+        color,
+        baseSize,
+        zIndex: baseSize,
+      });
+      markers.push(marker);
+      bounds.extend(position);
     });
+
+    if (cancelled) return;
+
+    markerRecordsRef.current = markerRecords;
+    markersRef.current = markers;
+
+    if (kakao.maps.MarkerClusterer) {
+      clustererRef.current = new kakao.maps.MarkerClusterer({
+        map,
+        markers,
+        averageCenter: true,
+        minLevel: 6,
+        calculator: [5, 10, 20],
+        styles: getClusterStyles(),
+      });
+    } else {
+      markers.forEach((marker) => marker.setMap(map));
+    }
+
+    if (markers.length > 1) {
+      map.setBounds(bounds);
+    } else if (markers.length === 1) {
+      map.setCenter(markers[0].getPosition());
+      map.setLevel(5);
+    }
+
+    setMarkerSummary({ total: franchises.length, unresolved });
+    setMarkersVersion((version) => version + 1);
+    applySelectedMarkerStyle(selectedFranchiseIdRef.current);
 
     return () => {
       cancelled = true;
     };
-  }, [applySelectedMarkerStyle, clearMapObjects, franchises, isMapReady, onMarkerClick, resolveCoordinates, salesRange]);
+  }, [applySelectedMarkerStyle, clearMapObjects, franchises, isMapReady, onMarkerClick, salesRange]);
 
   useEffect(() => {
     selectedFranchiseIdRef.current = selectedFranchiseId;

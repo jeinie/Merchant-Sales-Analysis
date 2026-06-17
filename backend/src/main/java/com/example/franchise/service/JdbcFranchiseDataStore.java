@@ -44,6 +44,8 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
 
     @PostConstruct
     void ensureAiInsightSchema() {
+        ensureFranchiseLocationColumns();
+
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS ai_insight_histories (
                     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -71,6 +73,42 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
             jdbcTemplate.execute("ALTER TABLE ai_insight_histories ADD COLUMN note TEXT");
         } catch (BadSqlGrammarException | DuplicateKeyException ex) {
             // Existing databases may already have the column; the table definition above handles fresh schemas.
+        }
+    }
+
+    private void ensureFranchiseLocationColumns() {
+        addColumnIfMissing(
+                "franchises",
+                "location_status",
+                "ALTER TABLE franchises ADD COLUMN location_status VARCHAR(20) NOT NULL DEFAULT 'UNVERIFIED' COMMENT '위치 좌표 검증 상태'");
+        addColumnIfMissing(
+                "franchises",
+                "geocoded_at",
+                "ALTER TABLE franchises ADD COLUMN geocoded_at TIMESTAMP NULL COMMENT '주소 기반 좌표 산출 시각'");
+        addColumnIfMissing(
+                "franchises",
+                "geocode_source",
+                "ALTER TABLE franchises ADD COLUMN geocode_source VARCHAR(50) COMMENT '좌표 산출 출처'");
+        addColumnIfMissing(
+                "franchises",
+                "location_note",
+                "ALTER TABLE franchises ADD COLUMN location_note VARCHAR(255) COMMENT '위치 검증 또는 보정 메모'");
+    }
+
+    private void addColumnIfMissing(String tableName, String columnName, String alterSql) {
+        Integer count = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                        FROM information_schema.columns
+                        WHERE table_schema = DATABASE()
+                          AND table_name = ?
+                          AND column_name = ?
+                        """,
+                Integer.class,
+                tableName,
+                columnName);
+
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(alterSql);
         }
     }
 
@@ -251,6 +289,39 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
     }
 
     @Override
+    public Franchise updateFranchiseLocation(
+            String franchiseId,
+            Double latitude,
+            Double longitude,
+            String locationStatus,
+            String geocodeSource,
+            String locationNote) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE franchises
+                        SET latitude = ?,
+                            longitude = ?,
+                            location_status = ?,
+                            geocoded_at = CASE WHEN ? IS NULL THEN geocoded_at ELSE CURRENT_TIMESTAMP END,
+                            geocode_source = ?,
+                            location_note = ?
+                        WHERE id = ?
+                        """,
+                latitude,
+                longitude,
+                locationStatus,
+                latitude,
+                geocodeSource,
+                locationNote,
+                franchiseId);
+
+        if (updated == 0) {
+            throw new IllegalArgumentException("존재하지 않는 가맹점입니다.");
+        }
+
+        return loadFranchiseById(franchiseId);
+    }
+
+    @Override
     public void toggleAi(String userId, boolean canUseAI) {
         int updated = jdbcTemplate.update(
                 "UPDATE users SET can_use_ai = ? WHERE id = ?",
@@ -278,16 +349,30 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
 
     private List<Franchise> loadAllFranchises() {
         List<Franchise> franchises = jdbcTemplate.query("""
-                SELECT id, name, industry, region, address, latitude, longitude
+                SELECT id, name, industry, region, address, latitude, longitude,
+                       location_status, geocoded_at, geocode_source, location_note
                 FROM franchises
                 ORDER BY id
                 """, this::mapFranchise);
         return attachMonthlySales(franchises);
     }
 
+    private Franchise loadFranchiseById(String franchiseId) {
+        Franchise franchise = jdbcTemplate.queryForObject("""
+                        SELECT id, name, industry, region, address, latitude, longitude,
+                               location_status, geocoded_at, geocode_source, location_note
+                        FROM franchises
+                        WHERE id = ?
+                        """,
+                this::mapFranchise,
+                franchiseId);
+        return attachMonthlySales(List.of(franchise)).get(0);
+    }
+
     private List<Franchise> loadFranchisesByIds(List<String> franchiseIds) {
         List<Franchise> franchises = namedJdbcTemplate.query("""
-                        SELECT id, name, industry, region, address, latitude, longitude
+                        SELECT id, name, industry, region, address, latitude, longitude,
+                               location_status, geocoded_at, geocode_source, location_note
                         FROM franchises
                         WHERE id IN (:ids)
                         ORDER BY id
@@ -377,6 +462,11 @@ public class JdbcFranchiseDataStore implements FranchiseDataStore {
         franchise.setAddress(rs.getString("address"));
         franchise.setLatitude(nullableDouble(rs, "latitude"));
         franchise.setLongitude(nullableDouble(rs, "longitude"));
+        franchise.setLocationStatus(rs.getString("location_status"));
+        Timestamp geocodedAt = rs.getTimestamp("geocoded_at");
+        franchise.setGeocodedAt(geocodedAt == null ? null : geocodedAt.toInstant());
+        franchise.setGeocodeSource(rs.getString("geocode_source"));
+        franchise.setLocationNote(rs.getString("location_note"));
         franchise.setMonthlySales(new ArrayList<>());
         return franchise;
     }

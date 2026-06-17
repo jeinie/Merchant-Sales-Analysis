@@ -38,5 +38,13 @@ public interface FranchiseDataStore {
 
     void assignManager(String franchiseId, String managerId);
 
+    Franchise updateFranchiseLocation(
+            String franchiseId,
+            Double latitude,
+            Double longitude,
+            String locationStatus,
+            String geocodeSource,
+            String locationNote);
+
     void toggleAi(String userId, boolean canUseAI);
 }

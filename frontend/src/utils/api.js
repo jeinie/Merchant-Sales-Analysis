@@ -164,6 +164,13 @@ export const api = {
     });
   },
 
+  async updateFranchiseLocation(franchiseId, payload) {
+    return request(`/admin/franchises/${encodeURIComponent(franchiseId)}/location`, {
+      method: 'POST',
+      body: payload,
+    });
+  },
+
   async toggleAi(userId, canUseAI) {
     return request('/admin/toggle-ai', {
       method: 'POST',
