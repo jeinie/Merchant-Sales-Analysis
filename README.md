@@ -28,7 +28,7 @@ Kakao Maps 위에 가맹점 위치를 표시하고, 최근 월 매출 규모는 
 
 ### 관리자 설정
 
-관리자는 가맹점별 담당 영업사원을 배정하고, 사용자별 AI 분석 권한을 관리할 수 있습니다.
+관리자는 가맹점 등록·수정, 위치 보정, 담당 영업사원 배정, 사용자별 AI 분석 권한을 관리할 수 있습니다. 가맹점 관리 탭에서는 관리 중/계약 종료/폐점/일시 중단/전체 상태 필터로 현재 관리 대상과 과거 관리 종료 이력을 함께 확인할 수 있으며, 비활성 가맹점은 종료 시각과 사유를 확인한 뒤 필요하면 재활성화할 수 있습니다.
 
 ![관리자 설정](./docs/screenshots/04-admin-page.png)
 
@@ -42,7 +42,10 @@ Kakao Maps 위에 가맹점 위치를 표시하고, 최근 월 매출 규모는 
 - 전월 대비 매출 변화율 기준 상승/보합/하락 마커 색상 구분
 - 지역/업종 필터링 및 가맹점 목록 선택
 - 월별 매출 추이 차트 및 업종 평균 비교
+- 관리자 페이지에서 신규 가맹점 등록, 기본 정보 수정, 주소 기반 위치 확인 및 수동 보정
 - 관리자 페이지에서 가맹점 담당자 배정
+- 가맹점 담당자 배정 이력 조회
+- 계약 종료/폐점/일시 중단 상태 변경, 비활성 가맹점 이력 조회 및 재활성화
 - 사용자별 AI 분석 권한 ON/OFF 설정
 - Gemini 기반 AI 운영 인사이트 생성
 - 전월 대비 매출/거래 건수/객단가 변화 기준 운영 알림 생성
@@ -385,7 +388,13 @@ DB seed data 기준 테스트 계정입니다.
 | `GET` | `/api/merchants/{id}/ai-insights` | 특정 가맹점 AI 인사이트 이력 조회 |
 | `GET` | `/api/merchants/{id}/ai-insights/latest` | 특정 가맹점 최근 AI 인사이트 조회 |
 | `POST` | `/api/merchants/{id}/ai-insights` | AI 인사이트 저장 |
+| `GET` | `/api/admin/merchants?status=ACTIVE` | 관리자용 가맹점 상태별 목록 조회. `ACTIVE`, `INACTIVE`, `CONTRACT_ENDED`, `CLOSED`, `SUSPENDED`, `ALL` 지원 |
+| `POST` | `/api/admin/merchants` | 신규 가맹점 등록. 동일 가맹점명+주소의 비활성 가맹점이 있으면 기존 행 재활성화 |
+| `PUT` | `/api/admin/merchants/{id}` | 가맹점 기본 정보 및 위치 정보 수정 |
+| `POST` | `/api/admin/merchants/{id}/status` | 가맹점 관리 상태 변경 및 재활성화 |
+| `POST` | `/api/admin/merchants/{id}/location` | 가맹점 좌표와 위치 검증 상태 보정 |
 | `POST` | `/api/admin/assign-manager` | 가맹점 담당자 변경 |
+| `GET` | `/api/admin/assignment-histories` | 가맹점 담당자 배정 변경 이력 조회 |
 | `POST` | `/api/admin/toggle-ai` | AI 분석 권한 변경 |
 
 인증이 필요한 API는 아래 형식의 Authorization 헤더를 사용합니다.
