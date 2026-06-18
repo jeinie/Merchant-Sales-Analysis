@@ -353,3 +353,5 @@ POST /api/admin/merchants/{merchantId}/geocode
 - `SUSPENDED`: 일시 관리 중단 또는 보류
 
 `ACTIVE`가 아닌 가맹점은 기본 목록, 지도, 담당자 배정 대상에서 제외한다. 관리 종료 시각과 사유 메모는 기존 `closed_at`, `closure_note` 컬럼을 사용하되 의미를 폐점 전용이 아닌 관리 종료 정보로 확장한다.
+
+동일한 가맹점명과 주소의 가맹점이 재등록되는 경우 새 가맹점 데이터를 만들지 않는다. 기존 가맹점이 `ACTIVE`이면 중복 등록 오류로 막고, `CLOSED`, `CONTRACT_ENDED`, `SUSPENDED` 상태이면 기존 행의 상태를 `ACTIVE`로 되돌린 뒤 입력된 최신 정보와 담당자를 반영한다.

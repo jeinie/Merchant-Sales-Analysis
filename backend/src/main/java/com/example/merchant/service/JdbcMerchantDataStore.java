@@ -427,6 +427,27 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
             throw new IllegalArgumentException("존재하지 않는 영업사원입니다.");
         }
 
+        Merchant existingMerchant = findMerchantByIdentity(name, address);
+        if (existingMerchant != null) {
+            if ("ACTIVE".equals(existingMerchant.getOperationalStatus())) {
+                throw new IllegalArgumentException("동일한 가맹점명과 주소의 가맹점이 이미 등록되어 있습니다.");
+            }
+
+            return reactivateMerchant(
+                    existingMerchant.getId(),
+                    name,
+                    industry,
+                    region,
+                    address,
+                    latitude,
+                    longitude,
+                    locationStatus,
+                    geocodeSource,
+                    locationNote,
+                    managerId,
+                    changedBy);
+        }
+
         String merchantId = nextMerchantId();
         jdbcTemplate.update("""
                         INSERT INTO merchant
@@ -447,6 +468,10 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
                 geocodeSource,
                 locationNote);
 
+        jdbcTemplate.update(
+                "DELETE FROM user_merchant_assignments WHERE merchant_id = ?",
+                merchantId);
+
         if (managerId != null && !managerId.isBlank()) {
             jdbcTemplate.update("""
                             INSERT INTO user_merchant_assignments (user_id, merchant_id)
@@ -455,6 +480,61 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
                     managerId,
                     merchantId);
             recordAssignmentHistory(merchantId, null, managerId, changedBy, "신규 가맹점 등록 시 담당자를 배정했습니다.");
+        }
+
+        return loadMerchantById(merchantId);
+    }
+
+    private Merchant reactivateMerchant(
+            String merchantId,
+            String name,
+            String industry,
+            String region,
+            String address,
+            Double latitude,
+            Double longitude,
+            String locationStatus,
+            String geocodeSource,
+            String locationNote,
+            String managerId,
+            String changedBy) {
+        jdbcTemplate.update("""
+                        UPDATE merchant
+                        SET name = ?,
+                            industry = ?,
+                            region = ?,
+                            address = ?,
+                            latitude = ?,
+                            longitude = ?,
+                            location_status = ?,
+                            geocoded_at = CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+                            geocode_source = ?,
+                            location_note = ?,
+                            operational_status = 'ACTIVE',
+                            closed_at = NULL,
+                            closure_note = NULL
+                        WHERE id = ?
+                        """,
+                name,
+                industry,
+                region,
+                address,
+                latitude,
+                longitude,
+                locationStatus,
+                latitude,
+                geocodeSource,
+                locationNote,
+                merchantId);
+
+        if (managerId != null && !managerId.isBlank()) {
+            jdbcTemplate.update("""
+                            INSERT INTO user_merchant_assignments (user_id, merchant_id)
+                            VALUES (?, ?)
+                            """,
+                    managerId,
+                    merchantId);
+            recordAssignmentHistory(merchantId, null, managerId, changedBy, "기존 관리 종료 가맹점을 재등록하며 담당자를 배정했습니다.");
         }
 
         return loadMerchantById(merchantId);
@@ -665,6 +745,26 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
                 this::mapMerchant,
                 merchantId);
         return attachMonthlySales(List.of(merchant)).get(0);
+    }
+
+    private Merchant findMerchantByIdentity(String name, String address) {
+        List<Merchant> matches = jdbcTemplate.query("""
+                        SELECT id, name, industry, region, address, latitude, longitude,
+                               location_status, geocoded_at, geocode_source, location_note,
+                               operational_status, closed_at, closure_note
+                        FROM merchant
+                        WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
+                          AND LOWER(TRIM(address)) = LOWER(TRIM(?))
+                        ORDER BY
+                          CASE WHEN operational_status = 'ACTIVE' THEN 0 ELSE 1 END,
+                          closed_at DESC,
+                          id DESC
+                        LIMIT 1
+                        """,
+                this::mapMerchant,
+                name,
+                address);
+        return matches.isEmpty() ? null : matches.get(0);
     }
 
     private List<Merchant> loadMerchantsByIds(List<String> merchantIds) {
