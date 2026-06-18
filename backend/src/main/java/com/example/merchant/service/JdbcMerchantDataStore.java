@@ -314,6 +314,17 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
     }
 
     @Override
+    public List<Merchant> getAdminMerchants(String status) {
+        String normalizedStatus = status == null || status.isBlank() ? "ACTIVE" : status.trim().toUpperCase();
+        return switch (normalizedStatus) {
+            case "ALL" -> loadMerchantsByOperationalStatus(null);
+            case "INACTIVE" -> loadInactiveMerchants();
+            case "ACTIVE", "CLOSED", "CONTRACT_ENDED", "SUSPENDED" -> loadMerchantsByOperationalStatus(normalizedStatus);
+            default -> throw new IllegalArgumentException("지원하지 않는 가맹점 상태 필터입니다.");
+        };
+    }
+
+    @Override
     public Map<String, Object> getAverages() {
         List<Merchant> merchants = loadAllMerchants();
         Map<String, Object> response = new LinkedHashMap<>();
@@ -589,25 +600,40 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
     @Override
     @Transactional
     public void updateMerchantStatus(String merchantId, String operationalStatus, String statusNote) {
-        int updated = jdbcTemplate.update("""
-                        UPDATE merchant
-                        SET operational_status = ?,
-                            closed_at = CURRENT_TIMESTAMP,
-                            closure_note = ?
-                        WHERE id = ?
-                          AND operational_status = 'ACTIVE'
-                        """,
-                operationalStatus,
-                statusNote,
-                merchantId);
-
-        if (updated == 0) {
-            throw new IllegalArgumentException("존재하지 않거나 이미 관리 종료 처리된 가맹점입니다.");
+        int updated;
+        if ("ACTIVE".equals(operationalStatus)) {
+            updated = jdbcTemplate.update("""
+                            UPDATE merchant
+                            SET operational_status = 'ACTIVE',
+                                closed_at = NULL,
+                                closure_note = NULL
+                            WHERE id = ?
+                              AND operational_status <> 'ACTIVE'
+                            """,
+                    merchantId);
+        } else {
+            updated = jdbcTemplate.update("""
+                            UPDATE merchant
+                            SET operational_status = ?,
+                                closed_at = CURRENT_TIMESTAMP,
+                                closure_note = ?
+                            WHERE id = ?
+                              AND operational_status = 'ACTIVE'
+                            """,
+                    operationalStatus,
+                    statusNote,
+                    merchantId);
         }
 
-        jdbcTemplate.update(
-                "DELETE FROM user_merchant_assignments WHERE merchant_id = ?",
-                merchantId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("존재하지 않거나 이미 해당 상태로 처리된 가맹점입니다.");
+        }
+
+        if (!"ACTIVE".equals(operationalStatus)) {
+            jdbcTemplate.update(
+                    "DELETE FROM user_merchant_assignments WHERE merchant_id = ?",
+                    merchantId);
+        }
     }
 
     @Override
@@ -731,6 +757,44 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
                 WHERE operational_status = 'ACTIVE'
                 ORDER BY id
                 """, this::mapMerchant);
+        return attachMonthlySales(merchants);
+    }
+
+    private List<Merchant> loadInactiveMerchants() {
+        List<Merchant> merchants = jdbcTemplate.query("""
+                SELECT id, name, industry, region, address, latitude, longitude,
+                       location_status, geocoded_at, geocode_source, location_note,
+                       operational_status, closed_at, closure_note
+                FROM merchant
+                WHERE operational_status <> 'ACTIVE'
+                ORDER BY closed_at DESC, id
+                """, this::mapMerchant);
+        return attachMonthlySales(merchants);
+    }
+
+    private List<Merchant> loadMerchantsByOperationalStatus(String status) {
+        if (status == null) {
+            List<Merchant> merchants = jdbcTemplate.query("""
+                    SELECT id, name, industry, region, address, latitude, longitude,
+                           location_status, geocoded_at, geocode_source, location_note,
+                           operational_status, closed_at, closure_note
+                    FROM merchant
+                    ORDER BY
+                      CASE WHEN operational_status = 'ACTIVE' THEN 0 ELSE 1 END,
+                      closed_at DESC,
+                      id
+                    """, this::mapMerchant);
+            return attachMonthlySales(merchants);
+        }
+
+        List<Merchant> merchants = jdbcTemplate.query("""
+                SELECT id, name, industry, region, address, latitude, longitude,
+                       location_status, geocoded_at, geocode_source, location_note,
+                       operational_status, closed_at, closure_note
+                FROM merchant
+                WHERE operational_status = ?
+                ORDER BY id
+                """, this::mapMerchant, status);
         return attachMonthlySales(merchants);
     }
 
@@ -913,7 +977,7 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
         merchant.setLocationNote(rs.getString("location_note"));
         merchant.setOperationalStatus(rs.getString("operational_status"));
         Timestamp closedAt = rs.getTimestamp("closed_at");
-        merchant.setClosedAt(closedAt == null ? null : closedAt.toInstant());
+        merchant.setClosedAt(closedAt == null ? null : closedAt.toLocalDateTime());
         merchant.setClosureNote(rs.getString("closure_note"));
         merchant.setMonthlySales(new ArrayList<>());
         return merchant;

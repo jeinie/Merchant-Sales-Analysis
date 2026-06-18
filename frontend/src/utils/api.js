@@ -157,6 +157,10 @@ export const api = {
     return request('/admin/users');
   },
 
+  async getAdminMerchants(status = 'ACTIVE') {
+    return request(`/admin/merchants?status=${encodeURIComponent(status)}`);
+  },
+
   async createMerchant(payload) {
     return request('/admin/merchants', {
       method: 'POST',

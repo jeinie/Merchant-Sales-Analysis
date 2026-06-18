@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -34,7 +35,8 @@ public class MerchantController {
             "VERIFIED",
             "FAILED",
             "MANUAL");
-    private static final Set<String> INACTIVE_OPERATIONAL_STATUSES = Set.of(
+    private static final Set<String> OPERATIONAL_STATUSES = Set.of(
+            "ACTIVE",
             "CLOSED",
             "CONTRACT_ENDED",
             "SUSPENDED");
@@ -67,6 +69,21 @@ public class MerchantController {
     public List<Merchant> getMerchants(HttpServletRequest request) {
         User user = currentUser(request);
         return riskService.enrich(dataStore.getMerchants(user.getId(), user.getRole()));
+    }
+
+    @GetMapping("/admin/merchants")
+    public ResponseEntity<?> getAdminMerchants(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "ACTIVE") String status) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        try {
+            return ResponseEntity.ok(riskService.enrich(dataStore.getAdminMerchants(status)));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
     }
 
     @GetMapping("/alerts")
@@ -374,7 +391,7 @@ public class MerchantController {
         }
 
         String operationalStatus = payload == null ? "" : stringValue(payload.get("operationalStatus")).toUpperCase();
-        if (!INACTIVE_OPERATIONAL_STATUSES.contains(operationalStatus)) {
+        if (!OPERATIONAL_STATUSES.contains(operationalStatus)) {
             return ResponseEntity.badRequest().body(Map.of("message", "지원하지 않는 가맹점 관리 상태입니다."));
         }
 

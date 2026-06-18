@@ -19,6 +19,8 @@ public interface MerchantDataStore {
 
     List<Merchant> getMerchants(String userId, String role);
 
+    List<Merchant> getAdminMerchants(String status);
+
     Map<String, Object> getAverages();
 
     List<AiInsightHistory> getAiInsights(String merchantId);

@@ -1,6 +1,7 @@
 package com.example.merchant.domain;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class Merchant {
@@ -16,7 +17,7 @@ public class Merchant {
     private String geocodeSource;
     private String locationNote;
     private String operationalStatus;
-    private Instant closedAt;
+    private LocalDateTime closedAt;
     private String closureNote;
     private String riskLevel;
     private Integer priorityScore;
@@ -123,11 +124,11 @@ public class Merchant {
         this.operationalStatus = operationalStatus;
     }
 
-    public Instant getClosedAt() {
+    public LocalDateTime getClosedAt() {
         return closedAt;
     }
 
-    public void setClosedAt(Instant closedAt) {
+    public void setClosedAt(LocalDateTime closedAt) {
         this.closedAt = closedAt;
     }
 

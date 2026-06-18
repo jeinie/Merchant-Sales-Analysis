@@ -79,6 +79,66 @@ const inactiveStatusOptions = [
   },
 ];
 
+const activeStatusOption = {
+  value: 'ACTIVE',
+  label: '재활성화',
+  description: '가맹점을 다시 관리 대상으로 전환합니다. 담당자는 재활성화 후 담당자 배정 탭에서 지정합니다.',
+};
+
+const merchantStatusFilters = [
+  { value: 'ACTIVE', label: '관리 중' },
+  { value: 'INACTIVE', label: '비활성 전체' },
+  { value: 'CONTRACT_ENDED', label: '계약 종료' },
+  { value: 'CLOSED', label: '폐점' },
+  { value: 'SUSPENDED', label: '일시 중단' },
+  { value: 'ALL', label: '전체' },
+];
+
+const operationalStatusLabel = {
+  ACTIVE: '관리 중',
+  CONTRACT_ENDED: '계약 종료',
+  CLOSED: '폐점',
+  SUSPENDED: '일시 중단',
+};
+
+const formatDateTime = (value) => {
+  if (!value) return '-';
+
+  const text = String(value);
+  const localMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (localMatch) {
+    const [, year, month, day, hour, minute, second = '00'] = localMatch;
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(new Date(Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second),
+    )));
+  }
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(value));
+};
+
 const panelStyle = {
   backgroundColor: 'white',
   padding: '20px',
@@ -99,6 +159,9 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
   const [statusTargetMerchant, setStatusTargetMerchant] = useState(null);
   const [statusForm, setStatusForm] = useState({ operationalStatus: 'CONTRACT_ENDED', statusNote: '' });
   const [isStatusSaving, setIsStatusSaving] = useState(false);
+  const [merchantStatusFilter, setMerchantStatusFilter] = useState('ACTIVE');
+  const [adminMerchants, setAdminMerchants] = useState([]);
+  const [isLoadingAdminMerchants, setIsLoadingAdminMerchants] = useState(false);
   const [placeCandidates, setPlaceCandidates] = useState([]);
   const [locationLookupSource, setLocationLookupSource] = useState('');
   const [assignmentHistories, setAssignmentHistories] = useState([]);
@@ -109,7 +172,9 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
   const markerRef = useRef(null);
 
   const salesUsers = usersData.filter(u => u.role === 'SALES');
-  const unresolvedCount = merchants.filter(merchant => !merchant.latitude || !merchant.longitude).length;
+  const displayedMerchants = adminMerchants.length || merchantStatusFilter !== 'ACTIVE' ? adminMerchants : merchants;
+  const unresolvedCount = displayedMerchants.filter(merchant => !merchant.latitude || !merchant.longitude).length;
+  const inactiveCount = displayedMerchants.filter(merchant => merchant.operationalStatus !== 'ACTIVE').length;
   const hasCoordinates = (merchant) => merchant.latitude != null && merchant.longitude != null;
   const getLocationStatusLabel = (merchant) => {
     if (hasCoordinates(merchant) && merchant.locationStatus === 'UNVERIFIED') {
@@ -141,6 +206,22 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
     });
     return result;
   }, [salesUsers]);
+
+  const loadAdminMerchants = async (status = merchantStatusFilter) => {
+    setIsLoadingAdminMerchants(true);
+    try {
+      const list = await api.getAdminMerchants(status);
+      setAdminMerchants(list);
+    } catch (err) {
+      alert(err.message || '가맹점 관리 목록을 불러오지 못했습니다.');
+    } finally {
+      setIsLoadingAdminMerchants(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAdminMerchants(merchantStatusFilter);
+  }, [merchantStatusFilter]);
 
   useEffect(() => {
     if (!isCreateOpen || !coordinates || window.kakao?.maps?.services) return;
@@ -380,6 +461,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
         await api.createMerchant(payload);
       }
       if (onRefresh) await onRefresh();
+      await loadAdminMerchants();
       closeCreateModal();
     } catch (err) {
       setFormError(err.message || (editingMerchant ? '가맹점 수정에 실패했습니다.' : '가맹점 등록에 실패했습니다.'));
@@ -389,9 +471,10 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
   };
 
   const openStatusModal = (merchant) => {
+    const isActive = merchant.operationalStatus === 'ACTIVE';
     setStatusTargetMerchant(merchant);
     setStatusForm({
-      operationalStatus: 'CONTRACT_ENDED',
+      operationalStatus: isActive ? 'CONTRACT_ENDED' : 'ACTIVE',
       statusNote: '',
     });
   };
@@ -406,7 +489,10 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
     event.preventDefault();
     if (!statusTargetMerchant) return;
 
-    const selectedStatus = inactiveStatusOptions.find(option => option.value === statusForm.operationalStatus);
+    const availableStatusOptions = statusTargetMerchant.operationalStatus === 'ACTIVE'
+      ? inactiveStatusOptions
+      : [activeStatusOption];
+    const selectedStatus = availableStatusOptions.find(option => option.value === statusForm.operationalStatus);
     const defaultNote = selectedStatus ? `관리자 화면에서 ${selectedStatus.label} 처리했습니다.` : '관리자 화면에서 관리 상태를 변경했습니다.';
 
     setIsStatusSaving(true);
@@ -417,6 +503,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
         statusForm.statusNote.trim() || defaultNote,
       );
       if (onRefresh) await onRefresh();
+      await loadAdminMerchants();
       setStatusTargetMerchant(null);
       setStatusForm({ operationalStatus: 'CONTRACT_ENDED', statusNote: '' });
     } catch (err) {
@@ -431,6 +518,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
     try {
       await api.assignManager(merchantId, newUserId, '담당자 배정 탭에서 담당자를 변경했습니다.');
       if (onRefresh) onRefresh();
+      await loadAdminMerchants();
     } catch (err) {
       alert(err.message || '담당자 할당에 실패했습니다.');
     }
@@ -504,7 +592,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
             <div>
               <h3 style={{ margin: 0, color: '#1f2937' }}>가맹점 관리</h3>
               <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.86rem' }}>
-                신규 가맹점을 등록하고 지도 표시용 좌표 확인 상태를 관리합니다. 좌표 미확인 {unresolvedCount}개
+                신규 가맹점을 등록하고 상태 변경 이력을 확인합니다. 좌표 미확인 {unresolvedCount}개 · 비활성 {inactiveCount}개
               </p>
             </div>
             <button
@@ -528,25 +616,75 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
             </button>
           </div>
 
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            {merchantStatusFilters.map(filter => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setMerchantStatusFilter(filter.value)}
+                style={{
+                  padding: '7px 11px',
+                  border: '1px solid #dbe3ef',
+                  borderRadius: '999px',
+                  backgroundColor: merchantStatusFilter === filter.value ? '#0f172a' : '#ffffff',
+                  color: merchantStatusFilter === filter.value ? '#ffffff' : '#475569',
+                  cursor: 'pointer',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                }}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', fontSize: '0.9rem' }}>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>가맹점</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>지역/업종</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>관리 상태</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>위치 상태</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>종료 정보</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>담당자</th>
                 <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb', textAlign: 'right' }}>관리</th>
               </tr>
             </thead>
             <tbody>
-              {merchants.map(merchant => (
-                <tr key={merchant.id}>
+              {isLoadingAdminMerchants && (
+                <tr>
+                  <td colSpan="7" style={{ padding: '18px', textAlign: 'center', color: '#64748b' }}>가맹점 목록을 불러오는 중입니다.</td>
+                </tr>
+              )}
+              {!isLoadingAdminMerchants && displayedMerchants.length === 0 && (
+                <tr>
+                  <td colSpan="7" style={{ padding: '18px', textAlign: 'center', color: '#64748b' }}>조건에 해당하는 가맹점이 없습니다.</td>
+                </tr>
+              )}
+              {!isLoadingAdminMerchants && displayedMerchants.map(merchant => {
+                const isActiveMerchant = merchant.operationalStatus === 'ACTIVE';
+                return (
+                <tr key={merchant.id} style={{ backgroundColor: isActiveMerchant ? '#ffffff' : '#fafafa', opacity: isActiveMerchant ? 1 : 0.82 }}>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', fontWeight: 700 }}>
                     {merchant.name}
                     <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.78rem', fontWeight: 500 }}>{merchant.address}</div>
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#6b7280', fontSize: '0.85rem' }}>
                     {merchant.region} / {merchant.industry}
+                  </td>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      padding: '4px 8px',
+                      borderRadius: '999px',
+                      backgroundColor: isActiveMerchant ? '#ecfdf5' : '#fef2f2',
+                      color: isActiveMerchant ? '#047857' : '#b91c1c',
+                      fontSize: '0.75rem',
+                      fontWeight: 900,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {operationalStatusLabel[merchant.operationalStatus] || merchant.operationalStatus}
+                    </span>
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6' }}>
                     <span style={{
@@ -564,35 +702,45 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                       {getLocationStatusLabel(merchant)}
                     </span>
                   </td>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#64748b', fontSize: '0.78rem', lineHeight: 1.45, maxWidth: '220px' }}>
+                    {isActiveMerchant ? '-' : (
+                      <>
+                        <div>{formatDateTime(merchant.closedAt)}</div>
+                        <div style={{ marginTop: '4px', color: '#475569' }}>{merchant.closureNote || '-'}</div>
+                      </>
+                    )}
+                  </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569', fontSize: '0.85rem' }}>
-                    {salesUsers.find(user => user.id === managerByMerchantId.get(merchant.id))?.name || '미배정'}
+                    {isActiveMerchant ? (salesUsers.find(user => user.id === managerByMerchantId.get(merchant.id))?.name || '미배정') : '-'}
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', textAlign: 'right' }}>
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(merchant)}
-                      title="가맹점 수정 및 위치 보정"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '34px',
-                        height: '34px',
-                        marginRight: '6px',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '8px',
-                        backgroundColor: '#eff6ff',
-                        color: '#2563eb',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <Pencil size={16} />
-                    </button>
+                    {isActiveMerchant && (
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(merchant)}
+                        title="가맹점 수정 및 위치 보정"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '34px',
+                          height: '34px',
+                          marginRight: '6px',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '8px',
+                          backgroundColor: '#eff6ff',
+                          color: '#2563eb',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => openStatusModal(merchant)}
                       disabled={isStatusSaving && statusTargetMerchant?.id === merchant.id}
-                      title="관리 상태 변경"
+                      title={isActiveMerchant ? '관리 상태 변경' : '재활성화'}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -610,7 +758,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                     </button>
                   </td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </div>
@@ -702,7 +850,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
               {!isLoadingHistories && assignmentHistories.map(history => (
                 <tr key={history.id}>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#64748b', fontSize: '0.82rem' }}>
-                    {history.createdAt ? new Date(history.createdAt).toLocaleString('ko-KR') : '-'}
+                    {formatDateTime(history.createdAt)}
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', fontWeight: 700 }}>
                     {history.merchantName || history.merchantId}
@@ -1062,14 +1210,15 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                   value={statusForm.operationalStatus}
                   onChange={(event) => setStatusForm(prev => ({ ...prev, operationalStatus: event.target.value }))}
                 >
-                  {inactiveStatusOptions.map(option => (
+                  {(statusTargetMerchant.operationalStatus === 'ACTIVE' ? inactiveStatusOptions : [activeStatusOption]).map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </label>
 
               <div style={{ padding: '12px', borderRadius: '8px', background: '#f8fafc', color: '#475569', fontSize: '0.86rem', lineHeight: 1.5 }}>
-                {inactiveStatusOptions.find(option => option.value === statusForm.operationalStatus)?.description}
+                {(statusTargetMerchant.operationalStatus === 'ACTIVE' ? inactiveStatusOptions : [activeStatusOption])
+                  .find(option => option.value === statusForm.operationalStatus)?.description}
               </div>
 
               <label className="filter-group">
@@ -1078,7 +1227,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                   value={statusForm.statusNote}
                   onChange={(event) => setStatusForm(prev => ({ ...prev, statusNote: event.target.value }))}
                   rows={4}
-                  placeholder="예: 계약 기간 만료로 관리 대상에서 제외"
+                  placeholder={statusForm.operationalStatus === 'ACTIVE' ? '예: 계약이 재개되어 다시 관리 대상에 포함' : '예: 계약 기간 만료로 관리 대상에서 제외'}
                   style={{
                     resize: 'vertical',
                     minHeight: '96px',
@@ -1091,7 +1240,9 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
               </label>
 
               <div style={{ padding: '12px', borderRadius: '8px', background: '#fff7ed', color: '#9a3412', fontSize: '0.84rem', fontWeight: 700, lineHeight: 1.5 }}>
-                상태를 변경하면 목록과 지도, 담당자 배정 대상에서 제외됩니다. 매출 데이터와 AI 분석 이력은 보존됩니다.
+                {statusForm.operationalStatus === 'ACTIVE'
+                  ? '재활성화하면 기본 목록에 다시 표시됩니다. 담당자는 담당자 배정 탭에서 다시 지정할 수 있습니다.'
+                  : '상태를 변경하면 기본 목록과 지도, 담당자 배정 대상에서 제외됩니다. 매출 데이터와 AI 분석 이력은 보존됩니다.'}
               </div>
             </div>
 
@@ -1116,7 +1267,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                 }}
               >
                 <Ban size={16} />
-                {isStatusSaving ? '변경 중' : '상태 변경'}
+                {isStatusSaving ? '변경 중' : (statusForm.operationalStatus === 'ACTIVE' ? '재활성화' : '상태 변경')}
               </button>
             </div>
           </form>
