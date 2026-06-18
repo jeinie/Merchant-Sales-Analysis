@@ -85,6 +85,7 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
         renameTableIfNeeded("user_franchise_assignments", "user_merchant_assignments");
 
         renameColumnIfNeeded("monthly_sales", "franchise_id", "merchant_id");
+        renameColumnIfNeeded("user_merchant_assignments", "franchise_id", "merchant_id");
         renameColumnIfNeeded("ai_insight_histories", "franchise_id", "merchant_id");
         renameColumnIfNeeded("assignment_histories", "franchise_id", "merchant_id");
 
