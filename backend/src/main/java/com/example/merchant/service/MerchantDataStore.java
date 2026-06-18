@@ -62,7 +62,7 @@ public interface MerchantDataStore {
             String geocodeSource,
             String locationNote);
 
-    void closeMerchant(String merchantId, String closureNote);
+    void updateMerchantStatus(String merchantId, String operationalStatus, String statusNote);
 
     void assignManager(String merchantId, String managerId, String changedBy, String changeReason);
 

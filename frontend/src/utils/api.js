@@ -178,6 +178,13 @@ export const api = {
     });
   },
 
+  async updateMerchantStatus(merchantId, operationalStatus, statusNote = '') {
+    return request(`/admin/merchants/${encodeURIComponent(merchantId)}/status`, {
+      method: 'POST',
+      body: { operationalStatus, statusNote },
+    });
+  },
+
   async assignManager(merchantId, managerId, changeReason = '') {
     return request('/admin/assign-manager', {
       method: 'POST',

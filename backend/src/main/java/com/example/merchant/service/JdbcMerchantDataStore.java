@@ -216,15 +216,15 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
         addColumnIfMissing(
                 "merchant",
                 "operational_status",
-                "ALTER TABLE merchant ADD COLUMN operational_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '가맹점 운영 상태: ACTIVE 또는 CLOSED'");
+                "ALTER TABLE merchant ADD COLUMN operational_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '가맹점 관리 상태: ACTIVE, CLOSED, CONTRACT_ENDED, SUSPENDED'");
         addColumnIfMissing(
                 "merchant",
                 "closed_at",
-                "ALTER TABLE merchant ADD COLUMN closed_at TIMESTAMP NULL COMMENT '폐점 처리 시각'");
+                "ALTER TABLE merchant ADD COLUMN closed_at TIMESTAMP NULL COMMENT '관리 종료 처리 시각'");
         addColumnIfMissing(
                 "merchant",
                 "closure_note",
-                "ALTER TABLE merchant ADD COLUMN closure_note VARCHAR(255) COMMENT '폐점 처리 사유 또는 메모'");
+                "ALTER TABLE merchant ADD COLUMN closure_note VARCHAR(255) COMMENT '관리 종료 사유 또는 메모'");
         backfillExistingMerchantLocationStatus();
     }
 
@@ -500,7 +500,7 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
                 merchantId);
 
         if (updated == 0) {
-            throw new IllegalArgumentException("존재하지 않거나 폐점 처리된 가맹점입니다.");
+            throw new IllegalArgumentException("존재하지 않거나 관리 종료 처리된 가맹점입니다.");
         }
 
         return loadMerchantById(merchantId);
@@ -508,20 +508,21 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
 
     @Override
     @Transactional
-    public void closeMerchant(String merchantId, String closureNote) {
+    public void updateMerchantStatus(String merchantId, String operationalStatus, String statusNote) {
         int updated = jdbcTemplate.update("""
                         UPDATE merchant
-                        SET operational_status = 'CLOSED',
+                        SET operational_status = ?,
                             closed_at = CURRENT_TIMESTAMP,
                             closure_note = ?
                         WHERE id = ?
                           AND operational_status = 'ACTIVE'
                         """,
-                closureNote,
+                operationalStatus,
+                statusNote,
                 merchantId);
 
         if (updated == 0) {
-            throw new IllegalArgumentException("존재하지 않거나 이미 폐점 처리된 가맹점입니다.");
+            throw new IllegalArgumentException("존재하지 않거나 이미 관리 종료 처리된 가맹점입니다.");
         }
 
         jdbcTemplate.update(
@@ -609,7 +610,7 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
                 merchantId);
 
         if (updated == 0) {
-            throw new IllegalArgumentException("존재하지 않거나 폐점 처리된 가맹점입니다.");
+            throw new IllegalArgumentException("존재하지 않거나 관리 종료 처리된 가맹점입니다.");
         }
 
         return loadMerchantById(merchantId);

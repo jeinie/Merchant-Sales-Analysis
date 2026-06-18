@@ -34,6 +34,10 @@ public class MerchantController {
             "VERIFIED",
             "FAILED",
             "MANUAL");
+    private static final Set<String> INACTIVE_OPERATIONAL_STATUSES = Set.of(
+            "CLOSED",
+            "CONTRACT_ENDED",
+            "SUSPENDED");
 
 
     private final MerchantDataStore dataStore;
@@ -353,8 +357,31 @@ public class MerchantController {
 
         try {
             String closureNote = payload == null ? "" : stringValue(payload.get("closureNote"));
-            dataStore.closeMerchant(merchantId, truncate(closureNote, 255));
+            dataStore.updateMerchantStatus(merchantId, "CLOSED", truncate(closureNote, 255));
             return ResponseEntity.ok(Map.of("message", "가맹점이 폐점 처리되었습니다."));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/merchants/{merchantId}/status")
+    public ResponseEntity<?> updateMerchantStatus(
+            HttpServletRequest request,
+            @PathVariable String merchantId,
+            @RequestBody(required = false) Map<String, Object> payload) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        String operationalStatus = payload == null ? "" : stringValue(payload.get("operationalStatus")).toUpperCase();
+        if (!INACTIVE_OPERATIONAL_STATUSES.contains(operationalStatus)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "지원하지 않는 가맹점 관리 상태입니다."));
+        }
+
+        try {
+            String statusNote = payload == null ? "" : stringValue(payload.get("statusNote"));
+            dataStore.updateMerchantStatus(merchantId, operationalStatus, truncate(statusNote, 255));
+            return ResponseEntity.ok(Map.of("message", "가맹점 관리 상태가 변경되었습니다."));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }

@@ -61,6 +61,24 @@ const statusLabel = {
   MANUAL: '수동 보정',
 };
 
+const inactiveStatusOptions = [
+  {
+    value: 'CONTRACT_ENDED',
+    label: '계약 종료',
+    description: '영업 또는 관리 계약이 종료되어 더 이상 담당 관리가 필요하지 않습니다.',
+  },
+  {
+    value: 'CLOSED',
+    label: '폐점',
+    description: '매장이 실제로 영업을 종료했습니다.',
+  },
+  {
+    value: 'SUSPENDED',
+    label: '일시 중단',
+    description: '계약, 운영, 확인 이슈로 임시 관리 대상에서 제외합니다.',
+  },
+];
+
 const panelStyle = {
   backgroundColor: 'white',
   padding: '20px',
@@ -78,7 +96,9 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
   const [formError, setFormError] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [closingMerchantId, setClosingMerchantId] = useState('');
+  const [statusTargetMerchant, setStatusTargetMerchant] = useState(null);
+  const [statusForm, setStatusForm] = useState({ operationalStatus: 'CONTRACT_ENDED', statusNote: '' });
+  const [isStatusSaving, setIsStatusSaving] = useState(false);
   const [placeCandidates, setPlaceCandidates] = useState([]);
   const [locationLookupSource, setLocationLookupSource] = useState('');
   const [assignmentHistories, setAssignmentHistories] = useState([]);
@@ -368,18 +388,41 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
     }
   };
 
-  const handleCloseMerchant = async (merchant) => {
-    const confirmed = window.confirm(`${merchant.name} 가맹점을 폐점 처리할까요?\n목록과 지도에서는 숨겨지지만 매출 데이터와 AI 분석 이력은 보존됩니다.`);
-    if (!confirmed) return;
+  const openStatusModal = (merchant) => {
+    setStatusTargetMerchant(merchant);
+    setStatusForm({
+      operationalStatus: 'CONTRACT_ENDED',
+      statusNote: '',
+    });
+  };
 
-    setClosingMerchantId(merchant.id);
+  const closeStatusModal = () => {
+    if (isStatusSaving) return;
+    setStatusTargetMerchant(null);
+    setStatusForm({ operationalStatus: 'CONTRACT_ENDED', statusNote: '' });
+  };
+
+  const handleStatusChange = async (event) => {
+    event.preventDefault();
+    if (!statusTargetMerchant) return;
+
+    const selectedStatus = inactiveStatusOptions.find(option => option.value === statusForm.operationalStatus);
+    const defaultNote = selectedStatus ? `관리자 화면에서 ${selectedStatus.label} 처리했습니다.` : '관리자 화면에서 관리 상태를 변경했습니다.';
+
+    setIsStatusSaving(true);
     try {
-      await api.closeMerchant(merchant.id, '관리자 화면에서 폐점 처리했습니다.');
+      await api.updateMerchantStatus(
+        statusTargetMerchant.id,
+        statusForm.operationalStatus,
+        statusForm.statusNote.trim() || defaultNote,
+      );
       if (onRefresh) await onRefresh();
+      setStatusTargetMerchant(null);
+      setStatusForm({ operationalStatus: 'CONTRACT_ENDED', statusNote: '' });
     } catch (err) {
-      alert(err.message || '가맹점 폐점 처리에 실패했습니다.');
+      alert(err.message || '가맹점 관리 상태 변경에 실패했습니다.');
     } finally {
-      setClosingMerchantId('');
+      setIsStatusSaving(false);
     }
   };
 
@@ -547,9 +590,9 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleCloseMerchant(merchant)}
-                      disabled={closingMerchantId === merchant.id}
-                      title="폐점 처리"
+                      onClick={() => openStatusModal(merchant)}
+                      disabled={isStatusSaving && statusTargetMerchant?.id === merchant.id}
+                      title="관리 상태 변경"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -558,9 +601,9 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                         height: '34px',
                         border: '1px solid #fecaca',
                         borderRadius: '8px',
-                        backgroundColor: closingMerchantId === merchant.id ? '#fee2e2' : '#fff1f2',
+                        backgroundColor: isStatusSaving && statusTargetMerchant?.id === merchant.id ? '#fee2e2' : '#fff1f2',
                         color: '#dc2626',
-                        cursor: closingMerchantId === merchant.id ? 'wait' : 'pointer',
+                        cursor: isStatusSaving && statusTargetMerchant?.id === merchant.id ? 'wait' : 'pointer',
                       }}
                     >
                       <Ban size={16} />
@@ -967,6 +1010,113 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
               >
                 <Save size={16} />
                 {isSaving ? '저장 중' : (editingMerchant ? '수정 저장' : '등록')}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {statusTargetMerchant && (
+        <div
+          onClick={closeStatusModal}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 70,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            background: 'rgba(15, 23, 42, 0.48)',
+          }}
+        >
+          <form
+            onSubmit={handleStatusChange}
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: 'min(520px, 100%)',
+              background: '#ffffff',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.24)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '18px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <div>
+                <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 800 }}>
+                  {statusTargetMerchant.id}
+                </div>
+                <h3 style={{ margin: '4px 0 0', color: '#0f172a', fontSize: '1.12rem' }}>
+                  {statusTargetMerchant.name} 관리 상태 변경
+                </h3>
+              </div>
+              <button type="button" onClick={closeStatusModal} aria-label="닫기" className="icon-button">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '14px', padding: '20px' }}>
+              <label className="filter-group">
+                <span className="filter-label">변경 상태</span>
+                <select
+                  value={statusForm.operationalStatus}
+                  onChange={(event) => setStatusForm(prev => ({ ...prev, operationalStatus: event.target.value }))}
+                >
+                  {inactiveStatusOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div style={{ padding: '12px', borderRadius: '8px', background: '#f8fafc', color: '#475569', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                {inactiveStatusOptions.find(option => option.value === statusForm.operationalStatus)?.description}
+              </div>
+
+              <label className="filter-group">
+                <span className="filter-label">사유 또는 메모</span>
+                <textarea
+                  value={statusForm.statusNote}
+                  onChange={(event) => setStatusForm(prev => ({ ...prev, statusNote: event.target.value }))}
+                  rows={4}
+                  placeholder="예: 계약 기간 만료로 관리 대상에서 제외"
+                  style={{
+                    resize: 'vertical',
+                    minHeight: '96px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    font: 'inherit',
+                  }}
+                />
+              </label>
+
+              <div style={{ padding: '12px', borderRadius: '8px', background: '#fff7ed', color: '#9a3412', fontSize: '0.84rem', fontWeight: 700, lineHeight: 1.5 }}>
+                상태를 변경하면 목록과 지도, 담당자 배정 대상에서 제외됩니다. 매출 데이터와 AI 분석 이력은 보존됩니다.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '16px 20px', borderTop: '1px solid #e2e8f0' }}>
+              <button type="button" onClick={closeStatusModal} style={{ padding: '9px 14px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: isStatusSaving ? 'wait' : 'pointer', fontWeight: 800 }}>
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={isStatusSaving}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  cursor: isStatusSaving ? 'wait' : 'pointer',
+                  fontWeight: 800,
+                }}
+              >
+                <Ban size={16} />
+                {isStatusSaving ? '변경 중' : '상태 변경'}
               </button>
             </div>
           </form>

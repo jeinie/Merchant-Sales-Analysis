@@ -21,9 +21,9 @@ CREATE TABLE IF NOT EXISTS merchant (
     geocoded_at TIMESTAMP NULL COMMENT '주소 기반 좌표 산출 시각',
     geocode_source VARCHAR(50) COMMENT '좌표 산출 출처',
     location_note VARCHAR(255) COMMENT '위치 검증 또는 보정 메모',
-    operational_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '가맹점 운영 상태: ACTIVE 또는 CLOSED',
-    closed_at TIMESTAMP NULL COMMENT '폐점 처리 시각',
-    closure_note VARCHAR(255) COMMENT '폐점 처리 사유 또는 메모',
+    operational_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '가맹점 관리 상태: ACTIVE, CLOSED, CONTRACT_ENDED, SUSPENDED',
+    closed_at TIMESTAMP NULL COMMENT '관리 종료 처리 시각',
+    closure_note VARCHAR(255) COMMENT '관리 종료 사유 또는 메모',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '가맹점 정보 생성 시각',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '가맹점 정보 최종 수정 시각',
     PRIMARY KEY (id)
