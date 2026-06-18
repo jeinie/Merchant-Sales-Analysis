@@ -1,10 +1,10 @@
-package com.example.franchise.domain;
+package com.example.merchant.domain;
 
 import java.util.List;
 
-public class FranchiseAlert {
-    private String franchiseId;
-    private String franchiseName;
+public class MerchantAlert {
+    private String merchantId;
+    private String merchantName;
     private String industry;
     private String region;
     private String riskLevel;
@@ -18,20 +18,20 @@ public class FranchiseAlert {
     private double txCountGrowthRate;
     private double avgTicketGrowthRate;
 
-    public String getFranchiseId() {
-        return franchiseId;
+    public String getMerchantId() {
+        return merchantId;
     }
 
-    public void setFranchiseId(String franchiseId) {
-        this.franchiseId = franchiseId;
+    public void setMerchantId(String merchantId) {
+        this.merchantId = merchantId;
     }
 
-    public String getFranchiseName() {
-        return franchiseName;
+    public String getMerchantName() {
+        return merchantName;
     }
 
-    public void setFranchiseName(String franchiseName) {
-        this.franchiseName = franchiseName;
+    public void setMerchantName(String merchantName) {
+        this.merchantName = merchantName;
     }
 
     public String getIndustry() {

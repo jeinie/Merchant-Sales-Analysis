@@ -1,8 +1,8 @@
-package com.example.franchise.controller;
+package com.example.merchant.controller;
 
-import com.example.franchise.domain.User;
-import com.example.franchise.service.FranchiseDataStore;
-import com.example.franchise.service.JwtService;
+import com.example.merchant.domain.User;
+import com.example.merchant.service.MerchantDataStore;
+import com.example.merchant.service.JwtService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,9 +20,9 @@ import java.util.Map;
 public class AuthController {
 
     private final JwtService jwtService;
-    private final FranchiseDataStore dataStore;
+    private final MerchantDataStore dataStore;
 
-    public AuthController(JwtService jwtService, FranchiseDataStore dataStore) {
+    public AuthController(JwtService jwtService, MerchantDataStore dataStore) {
         this.jwtService = jwtService;
         this.dataStore = dataStore;
     }

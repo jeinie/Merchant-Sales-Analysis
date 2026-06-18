@@ -113,8 +113,8 @@ export const api = {
     return request('/users');
   },
 
-  async getFranchises() {
-    return request('/franchises');
+  async getMerchants() {
+    return request('/merchants');
   },
 
   async getAverages() {
@@ -125,29 +125,29 @@ export const api = {
     return request('/alerts');
   },
 
-  async getAiInsights(franchiseId) {
-    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights`);
+  async getAiInsights(merchantId) {
+    return request(`/merchants/${encodeURIComponent(merchantId)}/ai-insights`);
   },
 
-  async getLatestAiInsight(franchiseId) {
-    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights/latest`);
+  async getLatestAiInsight(merchantId) {
+    return request(`/merchants/${encodeURIComponent(merchantId)}/ai-insights/latest`);
   },
 
-  async saveAiInsight(franchiseId, payload) {
-    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights`, {
+  async saveAiInsight(merchantId, payload) {
+    return request(`/merchants/${encodeURIComponent(merchantId)}/ai-insights`, {
       method: 'POST',
       body: payload,
     });
   },
 
-  async generateAiInsight(franchiseId) {
-    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights/generate`, {
+  async generateAiInsight(merchantId) {
+    return request(`/merchants/${encodeURIComponent(merchantId)}/ai-insights/generate`, {
       method: 'POST',
     });
   },
 
-  async updateAiInsightNote(franchiseId, insightId, note) {
-    return request(`/franchises/${encodeURIComponent(franchiseId)}/ai-insights/${encodeURIComponent(insightId)}/note`, {
+  async updateAiInsightNote(merchantId, insightId, note) {
+    return request(`/merchants/${encodeURIComponent(merchantId)}/ai-insights/${encodeURIComponent(insightId)}/note`, {
       method: 'POST',
       body: { note },
     });
@@ -157,29 +157,40 @@ export const api = {
     return request('/admin/users');
   },
 
-  async createFranchise(payload) {
-    return request('/admin/franchises', {
+  async createMerchant(payload) {
+    return request('/admin/merchants', {
       method: 'POST',
       body: payload,
     });
   },
 
-  async closeFranchise(franchiseId, closureNote = '') {
-    return request(`/admin/franchises/${encodeURIComponent(franchiseId)}/close`, {
+  async updateMerchant(merchantId, payload) {
+    return request(`/admin/merchants/${encodeURIComponent(merchantId)}`, {
+      method: 'PUT',
+      body: payload,
+    });
+  },
+
+  async closeMerchant(merchantId, closureNote = '') {
+    return request(`/admin/merchants/${encodeURIComponent(merchantId)}/close`, {
       method: 'POST',
       body: { closureNote },
     });
   },
 
-  async assignManager(franchiseId, managerId) {
+  async assignManager(merchantId, managerId, changeReason = '') {
     return request('/admin/assign-manager', {
       method: 'POST',
-      body: { franchiseId, managerId },
+      body: { merchantId, managerId, changeReason },
     });
   },
 
-  async updateFranchiseLocation(franchiseId, payload) {
-    return request(`/admin/franchises/${encodeURIComponent(franchiseId)}/location`, {
+  async getAssignmentHistories() {
+    return request('/admin/assignment-histories');
+  },
+
+  async updateMerchantLocation(merchantId, payload) {
+    return request(`/admin/merchants/${encodeURIComponent(merchantId)}/location`, {
       method: 'POST',
       body: payload,
     });

@@ -112,7 +112,7 @@ const AiInsightMarkdown = ({ content }) => {
   return <div className="ai-insight-markdown">{elements}</div>;
 };
 
-const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
+const DetailsPanel = ({ merchant, onClose, averages, currentUser }) => {
   const [aiInsight, setAiInsight] = useState(null);
   const [aiInsightMeta, setAiInsightMeta] = useState(null);
   const [aiInsightHistories, setAiInsightHistories] = useState([]);
@@ -135,15 +135,15 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     setAiError(null);
     setIsInsightModalOpen(false);
 
-    if (!franchise) {
+    if (!merchant) {
       return () => {
         cancelled = true;
       };
     }
 
     Promise.all([
-      api.getLatestAiInsight(franchise.id),
-      api.getAiInsights(franchise.id),
+      api.getLatestAiInsight(merchant.id),
+      api.getAiInsights(merchant.id),
     ])
       .then(([latest, histories]) => {
         if (cancelled) return;
@@ -162,9 +162,9 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     return () => {
       cancelled = true;
     };
-  }, [franchise?.id]);
+  }, [merchant?.id]);
 
-  if (!franchise) {
+  if (!merchant) {
     return (
       <div className="details-panel" style={{ transform: 'translateX(100%)' }}>
       </div>
@@ -176,19 +176,19 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     CHECK_REQUIRED: '점검 필요',
     CAUTION: '주의',
     NORMAL: '정상 관찰',
-  }[franchise.riskLevel] || franchise.riskLevel || '정상 관찰';
+  }[merchant.riskLevel] || merchant.riskLevel || '정상 관찰';
 
   const handleGenerateInsight = async () => {
     setIsGenerating(true);
     setAiError(null);
     try {
-      const saved = await api.generateAiInsight(franchise.id);
+      const saved = await api.generateAiInsight(merchant.id);
       setAiInsight(saved.content);
       setAiInsightMeta(saved);
       setInsightNote(saved.note || '');
       setSelectedHistoryId(saved.id);
       setActiveInsightTab('current');
-      setAiInsightHistories(await api.getAiInsights(franchise.id));
+      setAiInsightHistories(await api.getAiInsights(merchant.id));
     } catch (err) {
       setAiError(err.message);
     } finally {
@@ -200,7 +200,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     setActiveInsightTab('history');
     setIsInsightModalOpen(true);
     try {
-      setAiInsightHistories(await api.getAiInsights(franchise.id));
+      setAiInsightHistories(await api.getAiInsights(merchant.id));
     } catch (err) {
       console.error('AI 인사이트 이력 조회 실패:', err);
     }
@@ -219,7 +219,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
 
     setIsSavingNote(true);
     try {
-      const updated = await api.updateAiInsightNote(franchise.id, aiInsightMeta.id, insightNote);
+      const updated = await api.updateAiInsightNote(merchant.id, aiInsightMeta.id, insightNote);
       setAiInsightMeta(updated);
       setAiInsightHistories((histories) => histories.map(history => (
         history.id === updated.id ? updated : history
@@ -231,12 +231,12 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     }
   };
 
-  const labels = franchise.monthlySales.map(s => s.month);
-  const salesData = franchise.monthlySales.map(s => s.sales);
+  const labels = merchant.monthlySales.map(s => s.month);
+  const salesData = merchant.monthlySales.map(s => s.sales);
   
   // Get comparison data
-  const indAvg = industryAverages[franchise.industry]?.monthlySales.map(s => s.sales) || [];
-  const regAvg = regionAverages[franchise.region]?.monthlySales.map(s => s.sales) || [];
+  const indAvg = industryAverages[merchant.industry]?.monthlySales.map(s => s.sales) || [];
+  const regAvg = regionAverages[merchant.region]?.monthlySales.map(s => s.sales) || [];
 
   const data = {
     labels,
@@ -249,7 +249,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
         tension: 0.3,
       },
       {
-        label: `${franchise.industry} 평균`,
+        label: `${merchant.industry} 평균`,
         data: indAvg,
         borderColor: 'rgb(156, 163, 175)',
         backgroundColor: 'rgba(156, 163, 175, 0.5)',
@@ -290,7 +290,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
     <>
     <div className="details-panel open">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 className="section-title" style={{ margin: 0 }}>{franchise.name} 상세 정보</h2>
+        <h2 className="section-title" style={{ margin: 0 }}>{merchant.name} 상세 정보</h2>
         <button onClick={onClose} style={{ cursor: 'pointer', border: 'none', background: 'none', fontSize: '1.2rem' }}>✕</button>
       </div>
 
@@ -302,23 +302,23 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
         </div>
       </div>
 
-      <div className={`card risk-card ${franchise.riskLevel?.toLowerCase() || 'normal'}`}>
+      <div className={`card risk-card ${merchant.riskLevel?.toLowerCase() || 'normal'}`}>
         <div className="risk-card-header">
-          <span className={`risk-badge ${franchise.riskLevel?.toLowerCase() || 'normal'}`}>{riskLabel}</span>
-          <span className="alert-score">{franchise.priorityScore || 0}점</span>
+          <span className={`risk-badge ${merchant.riskLevel?.toLowerCase() || 'normal'}`}>{riskLabel}</span>
+          <span className="alert-score">{merchant.priorityScore || 0}점</span>
         </div>
         <h3 className="section-title">점검 사유</h3>
-        <p className="risk-summary-text">{franchise.riskSummary || '현재 기준에서는 정상 관찰 대상입니다.'}</p>
-        {franchise.alertReasons?.length > 0 && (
+        <p className="risk-summary-text">{merchant.riskSummary || '현재 기준에서는 정상 관찰 대상입니다.'}</p>
+        {merchant.alertReasons?.length > 0 && (
           <ul className="risk-reason-list">
-            {franchise.alertReasons.map((reason, index) => (
+            {merchant.alertReasons.map((reason, index) => (
               <li key={index}>{reason}</li>
             ))}
           </ul>
         )}
-        {franchise.alertTags?.length > 0 && (
+        {merchant.alertTags?.length > 0 && (
           <div className="risk-tag-list">
-            {franchise.alertTags.map((tag) => (
+            {merchant.alertTags.map((tag) => (
               <span key={tag}>{tag}</span>
             ))}
           </div>
@@ -418,7 +418,7 @@ const DetailsPanel = ({ franchise, onClose, averages, currentUser }) => {
           <div className="insight-modal-header">
             <div>
               <div className="metric-label">AI 운영 인사이트</div>
-              <h2 id="ai-insight-modal-title">{franchise.name}</h2>
+              <h2 id="ai-insight-modal-title">{merchant.name}</h2>
             </div>
             <button
               type="button"

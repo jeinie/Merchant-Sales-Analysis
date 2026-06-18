@@ -1,7 +1,7 @@
-package com.example.franchise.service;
+package com.example.merchant.service;
 
-import com.example.franchise.domain.Franchise;
-import com.example.franchise.domain.MonthlySales;
+import com.example.merchant.domain.Merchant;
+import com.example.merchant.domain.MonthlySales;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,7 +37,7 @@ public class AiInsightGenerationService {
         this.model = model;
     }
 
-    public String generate(Franchise franchise, Map<String, Object> averages) {
+    public String generate(Merchant merchant, Map<String, Object> averages) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("Gemini API 키가 백엔드에 설정되지 않았습니다.");
         }
@@ -49,7 +49,7 @@ public class AiInsightGenerationService {
                     + URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
             String body = objectMapper.writeValueAsString(Map.of(
                     "contents", List.of(Map.of(
-                            "parts", List.of(Map.of("text", buildPrompt(franchise, averages)))
+                            "parts", List.of(Map.of("text", buildPrompt(merchant, averages)))
                     ))
             ));
 
@@ -84,8 +84,8 @@ public class AiInsightGenerationService {
         return textNode.asText();
     }
 
-    private String buildPrompt(Franchise franchise, Map<String, Object> averages) {
-        List<MonthlySales> monthlySales = franchise.getMonthlySales();
+    private String buildPrompt(Merchant merchant, Map<String, Object> averages) {
+        List<MonthlySales> monthlySales = merchant.getMonthlySales();
         MonthlySales latest = monthlySales.get(monthlySales.size() - 1);
         MonthlySales previous = monthlySales.size() >= 2 ? monthlySales.get(monthlySales.size() - 2) : null;
         double salesGrowthRate = previous == null ? 0 : growthRate(latest.getSales(), previous.getSales());
@@ -99,8 +99,8 @@ public class AiInsightGenerationService {
                         item.getAvgTicket()))
                 .reduce("", (left, right) -> left + right + "\n");
 
-        long latestIndustryAverage = latestAverage(averages, "industryAverages", franchise.getIndustry());
-        long latestRegionAverage = latestAverage(averages, "regionAverages", franchise.getRegion());
+        long latestIndustryAverage = latestAverage(averages, "industryAverages", merchant.getIndustry());
+        long latestRegionAverage = latestAverage(averages, "regionAverages", merchant.getRegion());
         double industryGapRate = latestIndustryAverage == 0 ? 0 : growthRate(latest.getSales(), latestIndustryAverage);
         double regionGapRate = latestRegionAverage == 0 ? 0 : growthRate(latest.getSales(), latestRegionAverage);
         String salesStatus = salesGrowthRate >= 5 ? "상승" : salesGrowthRate <= -5 ? "하락" : "보합";
@@ -145,10 +145,10 @@ public class AiInsightGenerationService {
 
                 전체 답변은 500~700자 내외로 작성하고, 지표 기반 판단을 우선해주세요.
                 """.formatted(
-                franchise.getName(),
-                franchise.getIndustry(),
-                franchise.getRegion(),
-                franchise.getAddress(),
+                merchant.getName(),
+                merchant.getIndustry(),
+                merchant.getRegion(),
+                merchant.getAddress(),
                 latest.getSales(),
                 latest.getTxCount(),
                 latest.getAvgTicket(),
@@ -156,8 +156,8 @@ public class AiInsightGenerationService {
                 txCountGrowthRate,
                 avgTicketGrowthRate,
                 salesStatus,
-                franchise.getRiskLevel(),
-                franchise.getRiskSummary(),
+                merchant.getRiskLevel(),
+                merchant.getRiskSummary(),
                 monthlySalesSummary,
                 latestIndustryAverage,
                 latestRegionAverage,

@@ -1,4 +1,4 @@
-package com.example.franchise.service;
+package com.example.merchant.service;
 
 import org.junit.jupiter.api.Test;
 

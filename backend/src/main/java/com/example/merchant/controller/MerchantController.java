@@ -1,13 +1,13 @@
-package com.example.franchise.controller;
+package com.example.merchant.controller;
 
-import com.example.franchise.config.JwtAuthenticationFilter;
-import com.example.franchise.domain.AiInsightHistory;
-import com.example.franchise.domain.Franchise;
-import com.example.franchise.domain.FranchiseAlert;
-import com.example.franchise.domain.User;
-import com.example.franchise.service.AiInsightGenerationService;
-import com.example.franchise.service.FranchiseDataStore;
-import com.example.franchise.service.FranchiseRiskService;
+import com.example.merchant.config.JwtAuthenticationFilter;
+import com.example.merchant.domain.AiInsightHistory;
+import com.example.merchant.domain.Merchant;
+import com.example.merchant.domain.MerchantAlert;
+import com.example.merchant.domain.User;
+import com.example.merchant.service.AiInsightGenerationService;
+import com.example.merchant.service.MerchantDataStore;
+import com.example.merchant.service.MerchantRiskService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,7 +27,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
-public class FranchiseController {
+public class MerchantController {
     private static final Set<String> LOCATION_STATUSES = Set.of(
             "UNVERIFIED",
             "GEOCODED",
@@ -35,13 +36,13 @@ public class FranchiseController {
             "MANUAL");
 
 
-    private final FranchiseDataStore dataStore;
-    private final FranchiseRiskService riskService;
+    private final MerchantDataStore dataStore;
+    private final MerchantRiskService riskService;
     private final AiInsightGenerationService aiInsightGenerationService;
 
-    public FranchiseController(
-            FranchiseDataStore dataStore,
-            FranchiseRiskService riskService,
+    public MerchantController(
+            MerchantDataStore dataStore,
+            MerchantRiskService riskService,
             AiInsightGenerationService aiInsightGenerationService) {
         this.dataStore = dataStore;
         this.riskService = riskService;
@@ -58,34 +59,34 @@ public class FranchiseController {
         return dataStore.getPublicUsers();
     }
 
-    @GetMapping("/franchises")
-    public List<Franchise> getFranchises(HttpServletRequest request) {
+    @GetMapping("/merchants")
+    public List<Merchant> getMerchants(HttpServletRequest request) {
         User user = currentUser(request);
-        return riskService.enrich(dataStore.getFranchises(user.getId(), user.getRole()));
+        return riskService.enrich(dataStore.getMerchants(user.getId(), user.getRole()));
     }
 
     @GetMapping("/alerts")
-    public List<FranchiseAlert> getAlerts(HttpServletRequest request) {
+    public List<MerchantAlert> getAlerts(HttpServletRequest request) {
         User user = currentUser(request);
-        return riskService.alerts(dataStore.getFranchises(user.getId(), user.getRole()));
+        return riskService.alerts(dataStore.getMerchants(user.getId(), user.getRole()));
     }
 
-    @GetMapping("/franchises/{franchiseId}/ai-insights")
-    public ResponseEntity<?> getAiInsights(HttpServletRequest request, @org.springframework.web.bind.annotation.PathVariable String franchiseId) {
-        if (!canAccessFranchise(request, franchiseId)) {
+    @GetMapping("/merchants/{merchantId}/ai-insights")
+    public ResponseEntity<?> getAiInsights(HttpServletRequest request, @org.springframework.web.bind.annotation.PathVariable String merchantId) {
+        if (!canAccessMerchant(request, merchantId)) {
             return forbidden();
         }
 
-        return ResponseEntity.ok(dataStore.getAiInsights(franchiseId));
+        return ResponseEntity.ok(dataStore.getAiInsights(merchantId));
     }
 
-    @GetMapping("/franchises/{franchiseId}/ai-insights/latest")
-    public ResponseEntity<?> getLatestAiInsight(HttpServletRequest request, @org.springframework.web.bind.annotation.PathVariable String franchiseId) {
-        if (!canAccessFranchise(request, franchiseId)) {
+    @GetMapping("/merchants/{merchantId}/ai-insights/latest")
+    public ResponseEntity<?> getLatestAiInsight(HttpServletRequest request, @org.springframework.web.bind.annotation.PathVariable String merchantId) {
+        if (!canAccessMerchant(request, merchantId)) {
             return forbidden();
         }
 
-        AiInsightHistory latest = dataStore.getLatestAiInsight(franchiseId);
+        AiInsightHistory latest = dataStore.getLatestAiInsight(merchantId);
         if (latest == null) {
             return ResponseEntity.noContent().build();
         }
@@ -93,13 +94,13 @@ public class FranchiseController {
         return ResponseEntity.ok(latest);
     }
 
-    @PostMapping("/franchises/{franchiseId}/ai-insights")
+    @PostMapping("/merchants/{merchantId}/ai-insights")
     public ResponseEntity<?> saveAiInsight(
             HttpServletRequest request,
-            @org.springframework.web.bind.annotation.PathVariable String franchiseId,
+            @org.springframework.web.bind.annotation.PathVariable String merchantId,
             @RequestBody Map<String, Object> payload) {
         User user = currentUser(request);
-        if (!canAccessFranchise(request, franchiseId)) {
+        if (!canAccessMerchant(request, merchantId)) {
             return forbidden();
         }
 
@@ -119,7 +120,7 @@ public class FranchiseController {
         }
 
         AiInsightHistory saved = dataStore.saveAiInsight(
-                franchiseId,
+                merchantId,
                 user.getId(),
                 salesMonth,
                 riskLevel,
@@ -130,13 +131,13 @@ public class FranchiseController {
         return ResponseEntity.ok(saved);
     }
 
-    @PostMapping("/franchises/{franchiseId}/ai-insights/generate")
+    @PostMapping("/merchants/{merchantId}/ai-insights/generate")
     public ResponseEntity<?> generateAiInsight(
             HttpServletRequest request,
-            @org.springframework.web.bind.annotation.PathVariable String franchiseId) {
+            @org.springframework.web.bind.annotation.PathVariable String merchantId) {
         User user = currentUser(request);
-        Franchise franchise = findAccessibleFranchise(request, franchiseId);
-        if (franchise == null) {
+        Merchant merchant = findAccessibleMerchant(request, merchantId);
+        if (merchant == null) {
             return forbidden();
         }
 
@@ -145,22 +146,22 @@ public class FranchiseController {
                     .body(Map.of("message", "AI 분석 권한이 필요합니다."));
         }
 
-        if (franchise.getMonthlySales() == null || franchise.getMonthlySales().isEmpty()) {
+        if (merchant.getMonthlySales() == null || merchant.getMonthlySales().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "AI 분석에 필요한 매출 데이터가 없습니다."));
         }
 
         try {
-            String content = aiInsightGenerationService.generate(franchise, dataStore.getAverages());
-            String salesMonth = franchise.getMonthlySales().get(franchise.getMonthlySales().size() - 1).getMonth();
+            String content = aiInsightGenerationService.generate(merchant, dataStore.getAverages());
+            String salesMonth = merchant.getMonthlySales().get(merchant.getMonthlySales().size() - 1).getMonth();
             AiInsightHistory saved = dataStore.saveAiInsight(
-                    franchiseId,
+                    merchantId,
                     user.getId(),
                     salesMonth,
-                    fallback(franchise.getRiskLevel(), "NORMAL"),
-                    truncate(fallback(franchise.getRiskSummary(), franchise.getName() + " AI 운영 인사이트"), 500),
+                    fallback(merchant.getRiskLevel(), "NORMAL"),
+                    truncate(fallback(merchant.getRiskSummary(), merchant.getName() + " AI 운영 인사이트"), 500),
                     content,
                     "",
-                    franchise.getAlertTags() == null ? List.of() : franchise.getAlertTags());
+                    merchant.getAlertTags() == null ? List.of() : merchant.getAlertTags());
             return ResponseEntity.ok(saved);
         } catch (IllegalStateException ex) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
@@ -168,20 +169,20 @@ public class FranchiseController {
         }
     }
 
-    @PostMapping("/franchises/{franchiseId}/ai-insights/{insightId}/note")
+    @PostMapping("/merchants/{merchantId}/ai-insights/{insightId}/note")
     public ResponseEntity<?> updateAiInsightNote(
             HttpServletRequest request,
-            @org.springframework.web.bind.annotation.PathVariable String franchiseId,
+            @org.springframework.web.bind.annotation.PathVariable String merchantId,
             @org.springframework.web.bind.annotation.PathVariable Long insightId,
             @RequestBody Map<String, Object> payload) {
-        if (!canAccessFranchise(request, franchiseId)) {
+        if (!canAccessMerchant(request, merchantId)) {
             return forbidden();
         }
 
         try {
             AiInsightHistory updated = dataStore.updateAiInsightNote(
                     insightId,
-                    franchiseId,
+                    merchantId,
                     stringValue(payload.get("note")));
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException ex) {
@@ -209,23 +210,33 @@ public class FranchiseController {
             return forbidden();
         }
 
-        String franchiseId = payload.get("franchiseId");
+        User user = currentUser(request);
+        String merchantId = payload.get("merchantId");
         String managerId = payload.get("managerId");
 
-        if (franchiseId == null || franchiseId.isBlank()) {
+        if (merchantId == null || merchantId.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "가맹점 ID가 필요합니다."));
         }
 
         try {
-            dataStore.assignManager(franchiseId, managerId);
+            dataStore.assignManager(merchantId, managerId, user.getId(), fallback(payload.get("changeReason"), "관리자 화면에서 담당자를 변경했습니다."));
             return ResponseEntity.ok(Map.of("message", "담당 영업사원이 변경되었습니다."));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
 
-    @PostMapping("/admin/franchises")
-    public ResponseEntity<?> createFranchise(HttpServletRequest request, @RequestBody Map<String, Object> payload) {
+    @GetMapping("/admin/assignment-histories")
+    public ResponseEntity<?> getAssignmentHistories(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        return ResponseEntity.ok(dataStore.getAssignmentHistories());
+    }
+
+    @PostMapping("/admin/merchants")
+    public ResponseEntity<?> createMerchant(HttpServletRequest request, @RequestBody Map<String, Object> payload) {
         if (!isAdmin(request)) {
             return forbidden();
         }
@@ -259,7 +270,7 @@ public class FranchiseController {
         }
 
         try {
-            Franchise saved = dataStore.createFranchise(
+            Merchant saved = dataStore.createMerchant(
                     truncate(name, 120),
                     truncate(industry, 60),
                     truncate(region, 100),
@@ -269,17 +280,72 @@ public class FranchiseController {
                     locationStatus,
                     truncate(stringValue(payload.get("geocodeSource")), 50),
                     truncate(stringValue(payload.get("locationNote")), 255),
-                    managerId);
+                    managerId,
+                    currentUser(request).getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
 
-    @PostMapping("/admin/franchises/{franchiseId}/close")
-    public ResponseEntity<?> closeFranchise(
+    @PutMapping("/admin/merchants/{merchantId}")
+    public ResponseEntity<?> updateMerchant(
             HttpServletRequest request,
-            @PathVariable String franchiseId,
+            @PathVariable String merchantId,
+            @RequestBody Map<String, Object> payload) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        String name = stringValue(payload.get("name"));
+        String industry = stringValue(payload.get("industry"));
+        String region = stringValue(payload.get("region"));
+        String address = stringValue(payload.get("address"));
+        String locationStatus = fallback(stringValue(payload.get("locationStatus")), "UNVERIFIED").toUpperCase();
+
+        if (name.isBlank() || industry.isBlank() || region.isBlank() || address.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "가맹점명, 업종, 지역, 주소는 필수입니다."));
+        }
+        if (!LOCATION_STATUSES.contains(locationStatus)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "지원하지 않는 위치 상태입니다."));
+        }
+
+        Double latitude;
+        Double longitude;
+        try {
+            latitude = nullableDouble(payload.get("latitude"));
+            longitude = nullableDouble(payload.get("longitude"));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+
+        ResponseEntity<?> coordinateError = validateCoordinates(latitude, longitude, locationStatus);
+        if (coordinateError != null) {
+            return coordinateError;
+        }
+
+        try {
+            Merchant updated = dataStore.updateMerchant(
+                    merchantId,
+                    truncate(name, 120),
+                    truncate(industry, 60),
+                    truncate(region, 100),
+                    truncate(address, 255),
+                    latitude,
+                    longitude,
+                    locationStatus,
+                    truncate(stringValue(payload.get("geocodeSource")), 50),
+                    truncate(stringValue(payload.get("locationNote")), 255));
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/merchants/{merchantId}/close")
+    public ResponseEntity<?> closeMerchant(
+            HttpServletRequest request,
+            @PathVariable String merchantId,
             @RequestBody(required = false) Map<String, Object> payload) {
         if (!isAdmin(request)) {
             return forbidden();
@@ -287,17 +353,17 @@ public class FranchiseController {
 
         try {
             String closureNote = payload == null ? "" : stringValue(payload.get("closureNote"));
-            dataStore.closeFranchise(franchiseId, truncate(closureNote, 255));
+            dataStore.closeMerchant(merchantId, truncate(closureNote, 255));
             return ResponseEntity.ok(Map.of("message", "가맹점이 폐점 처리되었습니다."));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
 
-    @PostMapping("/admin/franchises/{franchiseId}/location")
-    public ResponseEntity<?> updateFranchiseLocation(
+    @PostMapping("/admin/merchants/{merchantId}/location")
+    public ResponseEntity<?> updateMerchantLocation(
             HttpServletRequest request,
-            @PathVariable String franchiseId,
+            @PathVariable String merchantId,
             @RequestBody Map<String, Object> payload) {
         if (!isAdmin(request)) {
             return forbidden();
@@ -322,8 +388,8 @@ public class FranchiseController {
         }
 
         try {
-            Franchise updated = dataStore.updateFranchiseLocation(
-                    franchiseId,
+            Merchant updated = dataStore.updateMerchantLocation(
+                    merchantId,
                     latitude,
                     longitude,
                     locationStatus,
@@ -365,18 +431,18 @@ public class FranchiseController {
         return user != null && "ADMIN".equals(user.getRole());
     }
 
-    private boolean canAccessFranchise(HttpServletRequest request, String franchiseId) {
-        return findAccessibleFranchise(request, franchiseId) != null;
+    private boolean canAccessMerchant(HttpServletRequest request, String merchantId) {
+        return findAccessibleMerchant(request, merchantId) != null;
     }
 
-    private Franchise findAccessibleFranchise(HttpServletRequest request, String franchiseId) {
+    private Merchant findAccessibleMerchant(HttpServletRequest request, String merchantId) {
         User user = currentUser(request);
-        if (user == null || franchiseId == null || franchiseId.isBlank()) {
+        if (user == null || merchantId == null || merchantId.isBlank()) {
             return null;
         }
 
-        return riskService.enrich(dataStore.getFranchises(user.getId(), user.getRole())).stream()
-                .filter(franchise -> franchiseId.equals(franchise.getId()))
+        return riskService.enrich(dataStore.getMerchants(user.getId(), user.getRole())).stream()
+                .filter(merchant -> merchantId.equals(merchant.getId()))
                 .findFirst()
                 .orElse(null);
     }

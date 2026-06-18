@@ -1,8 +1,8 @@
-package com.example.franchise.service;
+package com.example.merchant.service;
 
-import com.example.franchise.domain.Franchise;
-import com.example.franchise.domain.FranchiseAlert;
-import com.example.franchise.domain.MonthlySales;
+import com.example.merchant.domain.Merchant;
+import com.example.merchant.domain.MerchantAlert;
+import com.example.merchant.domain.MonthlySales;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -10,38 +10,38 @@ import java.util.Comparator;
 import java.util.List;
 
 @Service
-public class FranchiseRiskService {
+public class MerchantRiskService {
     static final double SALES_CAUTION_DROP_RATE = -10.0;
     static final double SALES_CHECK_REQUIRED_DROP_RATE = -15.0;
     static final double SALES_SPIKE_RATE = 20.0;
     static final double TX_COUNT_DROP_RATE = -12.0;
     static final double AVG_TICKET_DROP_RATE = -10.0;
 
-    public List<Franchise> enrich(List<Franchise> franchises) {
-        for (Franchise franchise : franchises) {
-            Assessment assessment = assess(franchise);
-            franchise.setRiskLevel(assessment.riskLevel());
-            franchise.setPriorityScore(assessment.priorityScore());
-            franchise.setRiskSummary(assessment.summary());
-            franchise.setAlertTags(assessment.tags());
-            franchise.setAlertReasons(assessment.reasons());
+    public List<Merchant> enrich(List<Merchant> merchants) {
+        for (Merchant merchant : merchants) {
+            Assessment assessment = assess(merchant);
+            merchant.setRiskLevel(assessment.riskLevel());
+            merchant.setPriorityScore(assessment.priorityScore());
+            merchant.setRiskSummary(assessment.summary());
+            merchant.setAlertTags(assessment.tags());
+            merchant.setAlertReasons(assessment.reasons());
         }
 
-        return franchises;
+        return merchants;
     }
 
-    public List<FranchiseAlert> alerts(List<Franchise> franchises) {
-        return franchises.stream()
-                .map(franchise -> toAlert(franchise, assess(franchise)))
+    public List<MerchantAlert> alerts(List<Merchant> merchants) {
+        return merchants.stream()
+                .map(merchant -> toAlert(merchant, assess(merchant)))
                 .filter(alert -> !"NORMAL".equals(alert.getRiskLevel()))
                 .sorted(Comparator
-                        .comparingInt(FranchiseAlert::getPriorityScore).reversed()
-                        .thenComparing(FranchiseAlert::getFranchiseName))
+                        .comparingInt(MerchantAlert::getPriorityScore).reversed()
+                        .thenComparing(MerchantAlert::getMerchantName))
                 .toList();
     }
 
-    Assessment assess(Franchise franchise) {
-        List<MonthlySales> monthlySales = franchise.getMonthlySales();
+    Assessment assess(Merchant merchant) {
+        List<MonthlySales> monthlySales = merchant.getMonthlySales();
         if (monthlySales == null || monthlySales.size() < 2) {
             return new Assessment(
                     "NORMAL",
@@ -116,16 +116,16 @@ public class FranchiseRiskService {
                 List.copyOf(reasons));
     }
 
-    private FranchiseAlert toAlert(Franchise franchise, Assessment assessment) {
-        List<MonthlySales> monthlySales = franchise.getMonthlySales();
+    private MerchantAlert toAlert(Merchant merchant, Assessment assessment) {
+        List<MonthlySales> monthlySales = merchant.getMonthlySales();
         MonthlySales latest = monthlySales == null || monthlySales.isEmpty() ? null : monthlySales.get(monthlySales.size() - 1);
         MonthlySales previous = monthlySales == null || monthlySales.size() < 2 ? null : monthlySales.get(monthlySales.size() - 2);
 
-        FranchiseAlert alert = new FranchiseAlert();
-        alert.setFranchiseId(franchise.getId());
-        alert.setFranchiseName(franchise.getName());
-        alert.setIndustry(franchise.getIndustry());
-        alert.setRegion(franchise.getRegion());
+        MerchantAlert alert = new MerchantAlert();
+        alert.setMerchantId(merchant.getId());
+        alert.setMerchantName(merchant.getName());
+        alert.setIndustry(merchant.getIndustry());
+        alert.setRegion(merchant.getRegion());
         alert.setRiskLevel(assessment.riskLevel());
         alert.setPriorityScore(assessment.priorityScore());
         alert.setSummary(assessment.summary());

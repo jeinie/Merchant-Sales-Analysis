@@ -61,9 +61,9 @@ const toNumber = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
-const readFranchiseCoordinates = (franchise) => {
-  const latitude = toNumber(franchise.latitude);
-  const longitude = toNumber(franchise.longitude);
+const readMerchantCoordinates = (merchant) => {
+  const latitude = toNumber(merchant.latitude);
+  const longitude = toNumber(merchant.longitude);
 
   if (latitude === null || longitude === null) {
     return null;
@@ -72,8 +72,8 @@ const readFranchiseCoordinates = (franchise) => {
   return { latitude, longitude };
 };
 
-const getLatestSalesStats = (franchise) => {
-  const monthlySales = franchise.monthlySales || [];
+const getLatestSalesStats = (merchant) => {
+  const monthlySales = merchant.monthlySales || [];
   const latest = monthlySales[monthlySales.length - 1];
   const previous = monthlySales[monthlySales.length - 2];
   const latestSales = Number(latest?.sales || 0);
@@ -90,9 +90,9 @@ const getLatestSalesStats = (franchise) => {
   };
 };
 
-const getSalesRange = (franchises) => {
-  const values = franchises
-    .map((franchise) => getLatestSalesStats(franchise).latestSales)
+const getSalesRange = (merchants) => {
+  const values = merchants
+    .map((merchant) => getLatestSalesStats(merchant).latestSales)
     .filter((value) => value > 0);
 
   if (values.length === 0) {
@@ -162,16 +162,16 @@ const createMarkerImage = (kakao, { color, size, selected }) => {
   return markerImage;
 };
 
-const createInfoWindowContent = (franchise, stats) => {
+const createInfoWindowContent = (merchant, stats) => {
   const growthClass = stats.trend === 'down' ? 'down' : stats.trend === 'up' ? 'up' : 'flat';
 
   return `
     <div class="map-info-window">
-      <div class="map-info-title">${escapeHtml(franchise.name)}</div>
-      <div class="map-info-meta">${escapeHtml(franchise.region)} · ${escapeHtml(franchise.industry)}</div>
+      <div class="map-info-title">${escapeHtml(merchant.name)}</div>
+      <div class="map-info-meta">${escapeHtml(merchant.region)} · ${escapeHtml(merchant.industry)}</div>
       <div class="map-info-sales">${formatSales(stats.latestSales)}</div>
       <div class="map-info-growth ${growthClass}">전월 대비 ${formatGrowthRate(stats.growthRate)}</div>
-      <div class="map-info-address">${escapeHtml(franchise.address)}</div>
+      <div class="map-info-address">${escapeHtml(merchant.address)}</div>
     </div>
   `;
 };
@@ -215,20 +215,20 @@ const getClusterStyles = () => [
   },
 ];
 
-const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
+const MapArea = ({ merchants, onMarkerClick, selectedMerchantId }) => {
   const mapContainer = useRef(null);
   const mapInstance = useRef(null);
   const markersRef = useRef([]);
   const markerRecordsRef = useRef(new Map());
   const clustererRef = useRef(null);
-  const selectedFranchiseIdRef = useRef(selectedFranchiseId);
+  const selectedMerchantIdRef = useRef(selectedMerchantId);
 
   const [isMapReady, setIsMapReady] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [markerSummary, setMarkerSummary] = useState({ total: 0, unresolved: 0 });
   const [markersVersion, setMarkersVersion] = useState(0);
 
-  const salesRange = useMemo(() => getSalesRange(franchises), [franchises]);
+  const salesRange = useMemo(() => getSalesRange(merchants), [merchants]);
 
   const clearMapObjects = useCallback(() => {
     markerRecordsRef.current.forEach(({ infoWindow }) => infoWindow.close());
@@ -249,8 +249,8 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
     const kakao = window.kakao;
     let selectedRecord = null;
 
-    markerRecordsRef.current.forEach((record, franchiseId) => {
-      const selected = franchiseId === selectedId;
+    markerRecordsRef.current.forEach((record, merchantId) => {
+      const selected = merchantId === selectedId;
       record.marker.setImage(createMarkerImage(kakao, {
         color: record.color,
         size: record.baseSize,
@@ -307,16 +307,16 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
     const map = mapInstance.current;
 
     clearMapObjects();
-    setMarkerSummary({ total: franchises.length, unresolved: 0 });
+    setMarkerSummary({ total: merchants.length, unresolved: 0 });
 
-    if (franchises.length === 0) {
+    if (merchants.length === 0) {
       setMarkersVersion((version) => version + 1);
       return;
     }
 
-    const resolved = franchises.map((franchise) => ({
-      franchise,
-      coordinates: readFranchiseCoordinates(franchise),
+    const resolved = merchants.map((merchant) => ({
+      merchant,
+      coordinates: readMerchantCoordinates(merchant),
     }));
 
     const bounds = new kakao.maps.LatLngBounds();
@@ -324,19 +324,19 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
     const markers = [];
     let unresolved = 0;
 
-    resolved.forEach(({ franchise, coordinates }) => {
+    resolved.forEach(({ merchant, coordinates }) => {
       if (!coordinates) {
         unresolved += 1;
         return;
       }
 
-      const stats = getLatestSalesStats(franchise);
+      const stats = getLatestSalesStats(merchant);
       const color = TREND_COLORS[stats.trend];
       const baseSize = getMarkerSize(stats.latestSales, salesRange);
       const position = new kakao.maps.LatLng(coordinates.latitude, coordinates.longitude);
       const marker = new kakao.maps.Marker({
         position,
-        title: franchise.name,
+        title: merchant.name,
         image: createMarkerImage(kakao, {
           color,
           size: baseSize,
@@ -344,24 +344,24 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
         }),
       });
       const infoWindow = new kakao.maps.InfoWindow({
-        content: createInfoWindowContent(franchise, stats),
+        content: createInfoWindowContent(merchant, stats),
         zIndex: 20,
       });
 
       kakao.maps.event.addListener(marker, 'click', () => {
         infoWindow.open(map, marker);
-        onMarkerClick(franchise.id);
+        onMarkerClick(merchant.id);
       });
       kakao.maps.event.addListener(marker, 'mouseover', () => {
         infoWindow.open(map, marker);
       });
       kakao.maps.event.addListener(marker, 'mouseout', () => {
-        if (selectedFranchiseIdRef.current !== franchise.id) {
+        if (selectedMerchantIdRef.current !== merchant.id) {
           infoWindow.close();
         }
       });
 
-      markerRecords.set(franchise.id, {
+      markerRecords.set(merchant.id, {
         marker,
         infoWindow,
         position,
@@ -398,19 +398,19 @@ const MapArea = ({ franchises, onMarkerClick, selectedFranchiseId }) => {
       map.setLevel(5);
     }
 
-    setMarkerSummary({ total: franchises.length, unresolved });
+    setMarkerSummary({ total: merchants.length, unresolved });
     setMarkersVersion((version) => version + 1);
-    applySelectedMarkerStyle(selectedFranchiseIdRef.current);
+    applySelectedMarkerStyle(selectedMerchantIdRef.current);
 
     return () => {
       cancelled = true;
     };
-  }, [applySelectedMarkerStyle, clearMapObjects, franchises, isMapReady, onMarkerClick, salesRange]);
+  }, [applySelectedMarkerStyle, clearMapObjects, merchants, isMapReady, onMarkerClick, salesRange]);
 
   useEffect(() => {
-    selectedFranchiseIdRef.current = selectedFranchiseId;
-    applySelectedMarkerStyle(selectedFranchiseId);
-  }, [applySelectedMarkerStyle, markersVersion, selectedFranchiseId]);
+    selectedMerchantIdRef.current = selectedMerchantId;
+    applySelectedMarkerStyle(selectedMerchantId);
+  }, [applySelectedMarkerStyle, markersVersion, selectedMerchantId]);
 
   useEffect(() => () => clearMapObjects(), [clearMapObjects]);
 

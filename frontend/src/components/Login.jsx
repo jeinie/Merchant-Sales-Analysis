@@ -18,11 +18,11 @@ const Login = ({ usersData, onLogin }) => {
     }
   };
 
-  const getFranchiseDescription = (user) => {
+  const getMerchantDescription = (user) => {
     if (user.role === 'ADMIN') return '전체 가맹점 접근 가능';
-    if (!user.assignedFranchiseIds || user.assignedFranchiseIds.length === 0) return '담당 가맹점 없음';
+    if (!user.assignedMerchantIds || user.assignedMerchantIds.length === 0) return '담당 가맹점 없음';
 
-    return `${user.assignedFranchiseIds.length}개 가맹점 담당`;
+    return `${user.assignedMerchantIds.length}개 가맹점 담당`;
   };
   const displayUsers = usersData || [];
 
@@ -102,7 +102,7 @@ const Login = ({ usersData, onLogin }) => {
           {displayUsers.length > 0 ? (
             displayUsers.map(u => (
               <div key={u.id} style={{ marginTop: '6px' }}>
-                - {u.name}: <code>{u.id}</code> <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '4px' }}>({getFranchiseDescription(u)})</span>
+                - {u.name}: <code>{u.id}</code> <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '4px' }}>({getMerchantDescription(u)})</span>
               </div>
             ))
           ) : (

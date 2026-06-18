@@ -1,8 +1,8 @@
-package com.example.franchise.domain;
+package com.example.merchant.domain;
 
 public class MonthlySales {
     private Long id;
-    private String franchiseId;
+    private String merchantId;
     private String month;
     private Long sales;
     private Integer txCount;
@@ -16,12 +16,12 @@ public class MonthlySales {
         this.id = id;
     }
 
-    public String getFranchiseId() {
-        return franchiseId;
+    public String getMerchantId() {
+        return merchantId;
     }
 
-    public void setFranchiseId(String franchiseId) {
-        this.franchiseId = franchiseId;
+    public void setMerchantId(String merchantId) {
+        this.merchantId = merchantId;
     }
 
     public String getMonth() {

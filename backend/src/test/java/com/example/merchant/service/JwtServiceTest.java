@@ -1,6 +1,6 @@
-package com.example.franchise.service;
+package com.example.merchant.service;
 
-import com.example.franchise.domain.User;
+import com.example.merchant.domain.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +52,7 @@ class JwtServiceTest {
         user.setId("sales_user");
         user.setName("Sales User");
         user.setRole("SALES");
-        user.setAssignedFranchiseIds(List.of("F001"));
+        user.setAssignedMerchantIds(List.of("M001"));
         user.setPermissions(Map.of("canUseAI", true));
         return user;
     }

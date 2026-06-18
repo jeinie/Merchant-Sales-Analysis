@@ -1,9 +1,9 @@
-package com.example.franchise.domain;
+package com.example.merchant.domain;
 
 import java.time.Instant;
 import java.util.List;
 
-public class Franchise {
+public class Merchant {
     private String id;
     private String name;
     private String industry;

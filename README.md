@@ -83,7 +83,7 @@ Kakao Maps 위에 가맹점 위치를 표시하고, 최근 월 매출 규모는 
 ```text
 .
 ├── backend
-│   ├── src/main/java/com/example/franchise
+│   ├── src/main/java/com/example/merchant
 │   │   ├── config
 │   │   ├── controller
 │   │   ├── domain
@@ -221,7 +221,7 @@ FRANCHISE_JWT_SECRET=your-secret-key
 
 ### GCP Cloud SQL(MySQL) 연동
 
-현재 백엔드는 GCP Cloud SQL에 저장된 데이터를 사용합니다. `JdbcFranchiseDataStore`는 `gcp` 프로필에서만 Spring Bean으로 등록되므로, 일반 Gradle로 실행할 때는 `SPRING_PROFILES_ACTIVE=gcp`를 반드시 설정해야 합니다. Windows helper script인 `backend/gradle-java17.cmd`는 이 값을 기본으로 설정합니다.
+현재 백엔드는 GCP Cloud SQL에 저장된 데이터를 사용합니다. `JdbcMerchantDataStore`는 `gcp` 프로필에서만 Spring Bean으로 등록되므로, 일반 Gradle로 실행할 때는 `SPRING_PROFILES_ACTIVE=gcp`를 반드시 설정해야 합니다. Windows helper script인 `backend/gradle-java17.cmd`는 이 값을 기본으로 설정합니다.
 
 `application-gcp.yml`은 로컬 DB 연결 정보를 담을 수 있으므로 Git에 포함하지 않습니다. 처음 설정할 때는 예시 파일을 복사해 로컬 설정 파일을 만듭니다.
 
@@ -341,7 +341,7 @@ SQL 파일은 `backend/src/main/resources/db/mysql/schema.sql`, `backend/src/mai
 
 #### 자주 발생하는 오류
 
-`No qualifying bean of type 'FranchiseDataStore'`
+`No qualifying bean of type 'MerchantDataStore'`
 
 `gcp` 프로필이 활성화되지 않은 상태입니다. Windows에서는 `.\gradle-java17.cmd bootRun --no-problems-report`를 사용하고, 일반 Gradle에서는 `SPRING_PROFILES_ACTIVE=gcp`를 설정합니다.
 
@@ -379,12 +379,12 @@ DB seed data 기준 테스트 계정입니다.
 | `GET` | `/api/auth/test-users` | 테스트 계정 목록 조회 |
 | `POST` | `/api/auth/login` | 로그인 및 JWT 발급 |
 | `GET` | `/api/users` | 사용자 목록 조회 |
-| `GET` | `/api/franchises` | 가맹점 목록 조회 |
+| `GET` | `/api/merchants` | 가맹점 목록 조회 |
 | `GET` | `/api/averages` | 업종/지역 평균 매출 조회 |
 | `GET` | `/api/alerts` | 운영 알림 목록 조회 |
-| `GET` | `/api/franchises/{id}/ai-insights` | 특정 가맹점 AI 인사이트 이력 조회 |
-| `GET` | `/api/franchises/{id}/ai-insights/latest` | 특정 가맹점 최근 AI 인사이트 조회 |
-| `POST` | `/api/franchises/{id}/ai-insights` | AI 인사이트 저장 |
+| `GET` | `/api/merchants/{id}/ai-insights` | 특정 가맹점 AI 인사이트 이력 조회 |
+| `GET` | `/api/merchants/{id}/ai-insights/latest` | 특정 가맹점 최근 AI 인사이트 조회 |
+| `POST` | `/api/merchants/{id}/ai-insights` | AI 인사이트 저장 |
 | `POST` | `/api/admin/assign-manager` | 가맹점 담당자 변경 |
 | `POST` | `/api/admin/toggle-ai` | AI 분석 권한 변경 |
 

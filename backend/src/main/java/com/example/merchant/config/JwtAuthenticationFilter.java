@@ -1,8 +1,8 @@
-package com.example.franchise.config;
+package com.example.merchant.config;
 
-import com.example.franchise.domain.User;
-import com.example.franchise.service.FranchiseDataStore;
-import com.example.franchise.service.JwtService;
+import com.example.merchant.domain.User;
+import com.example.merchant.service.MerchantDataStore;
+import com.example.merchant.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,9 +19,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public static final String CURRENT_USER_ATTRIBUTE = "currentUser";
 
     private final JwtService jwtService;
-    private final FranchiseDataStore dataStore;
+    private final MerchantDataStore dataStore;
 
-    public JwtAuthenticationFilter(JwtService jwtService, FranchiseDataStore dataStore) {
+    public JwtAuthenticationFilter(JwtService jwtService, MerchantDataStore dataStore) {
         this.jwtService = jwtService;
         this.dataStore = dataStore;
     }

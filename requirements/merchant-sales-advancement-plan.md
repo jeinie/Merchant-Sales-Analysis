@@ -32,9 +32,9 @@
 현재 핵심 테이블은 다음과 같다.
 
 - `users`: 사용자, 역할, AI 사용 권한
-- `franchises`: 가맹점 기본 정보, 주소, 좌표
+- `merchants`: 가맹점 기본 정보, 주소, 좌표
 - `monthly_sales`: 가맹점별 월 매출, 거래 건수, 객단가
-- `user_franchise_assignments`: 영업사원과 가맹점 배정 관계
+- `user_merchant_assignments`: 영업사원과 가맹점 배정 관계
 
 현재 구조는 MVP 분석에는 충분하지만, 알림 이력, 조치 이력, AI 분석 저장, 목표 관리, 데이터 업로드 검증을 처리하기에는 별도 테이블이 필요하다.
 
@@ -106,7 +106,7 @@
 #### 백엔드 변경안
 
 - `GET /api/alerts` 추가
-- `GET /api/franchises` 응답에 `riskLevel`, `priorityScore`, `alertTags` 추가 검토
+- `GET /api/merchants` 응답에 `riskLevel`, `priorityScore`, `alertTags` 추가 검토
 - 우선순위 계산 로직을 서비스 계층으로 분리
 
 #### 프론트엔드 변경안
@@ -133,7 +133,7 @@
 ```sql
 CREATE TABLE ai_insight_histories (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    franchise_id VARCHAR(20) NOT NULL,
+    merchant_id VARCHAR(20) NOT NULL,
     created_by VARCHAR(64) NOT NULL,
     sales_month CHAR(7) NOT NULL,
     risk_level VARCHAR(20) NOT NULL,
@@ -142,9 +142,9 @@ CREATE TABLE ai_insight_histories (
     tags VARCHAR(255),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY idx_ai_insight_franchise_month (franchise_id, sales_month),
-    CONSTRAINT fk_ai_insight_franchise
-        FOREIGN KEY (franchise_id) REFERENCES franchises (id)
+    KEY idx_ai_insight_merchant_month (merchant_id, sales_month),
+    CONSTRAINT fk_ai_insight_merchant
+        FOREIGN KEY (merchant_id) REFERENCES merchants (id)
         ON DELETE CASCADE,
     CONSTRAINT fk_ai_insight_user
         FOREIGN KEY (created_by) REFERENCES users (id)
@@ -154,9 +154,9 @@ CREATE TABLE ai_insight_histories (
 
 #### API 변경안
 
-- `GET /api/franchises/{id}/ai-insights`
-- `POST /api/franchises/{id}/ai-insights`
-- `GET /api/franchises/{id}/ai-insights/latest`
+- `GET /api/merchants/{id}/ai-insights`
+- `POST /api/merchants/{id}/ai-insights`
+- `GET /api/merchants/{id}/ai-insights/latest`
 
 #### 프론트엔드 변경안
 
@@ -182,7 +182,7 @@ CREATE TABLE ai_insight_histories (
 ```sql
 CREATE TABLE action_items (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    franchise_id VARCHAR(20) NOT NULL,
+    merchant_id VARCHAR(20) NOT NULL,
     assigned_user_id VARCHAR(64),
     source_type VARCHAR(30) NOT NULL,
     source_id BIGINT,
@@ -193,10 +193,10 @@ CREATE TABLE action_items (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    KEY idx_action_franchise_status (franchise_id, status),
+    KEY idx_action_merchant_status (merchant_id, status),
     KEY idx_action_assignee_status (assigned_user_id, status),
-    CONSTRAINT fk_action_franchise
-        FOREIGN KEY (franchise_id) REFERENCES franchises (id)
+    CONSTRAINT fk_action_merchant
+        FOREIGN KEY (merchant_id) REFERENCES merchants (id)
         ON DELETE CASCADE,
     CONSTRAINT fk_action_assignee
         FOREIGN KEY (assigned_user_id) REFERENCES users (id)

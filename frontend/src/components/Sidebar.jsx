@@ -5,10 +5,10 @@ const Sidebar = ({
   setSelectedRegion, 
   selectedIndustry, 
   setSelectedIndustry,
-  franchisesCount,
-  franchises,
-  selectedFranchiseId,
-  setSelectedFranchiseId,
+  merchantsCount,
+  merchants,
+  selectedMerchantId,
+  setSelectedMerchantId,
   riskLabels = {}
 }) => {
   return (
@@ -45,19 +45,19 @@ const Sidebar = ({
 
       <div className="card" style={{ marginTop: 'auto' }}>
         <div className="metric-label">검색된 가맹점 수</div>
-        <div className="metric-value">{franchisesCount}개</div>
+        <div className="metric-value">{merchantsCount}개</div>
       </div>
 
       {/* 가맹점 리스트 */}
       <div style={{ marginTop: '24px' }}>
         <h3 className="section-title">가맹점 목록</h3>
         <ul style={{ listStyle: 'none', padding: 0, maxHeight: '300px', overflowY: 'auto' }}>
-          {franchises.map(fr => (
+          {merchants.map(fr => (
             <li key={fr.id}
                 style={{ padding: '10px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border-color)' }}
-                onClick={() => setSelectedFranchiseId(fr.id)}>
-              <div className="franchise-list-header">
-                <span style={{ fontWeight: selectedFranchiseId === fr.id ? '600' : '400' }}>{fr.name}</span>
+                onClick={() => setSelectedMerchantId(fr.id)}>
+              <div className="merchant-list-header">
+                <span style={{ fontWeight: selectedMerchantId === fr.id ? '600' : '400' }}>{fr.name}</span>
                 {fr.riskLevel && fr.riskLevel !== 'NORMAL' && (
                   <span className={`risk-badge compact ${fr.riskLevel.toLowerCase()}`}>
                     {riskLabels[fr.riskLevel] || fr.riskLevel}
@@ -66,7 +66,7 @@ const Sidebar = ({
               </div>
               <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{fr.region} / {fr.industry}</div>
               {fr.riskSummary && fr.riskLevel !== 'NORMAL' && (
-                <div className="franchise-risk-summary">{fr.riskSummary}</div>
+                <div className="merchant-risk-summary">{fr.riskSummary}</div>
               )}
             </li>
           ))}

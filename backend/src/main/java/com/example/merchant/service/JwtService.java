@@ -1,6 +1,6 @@
-package com.example.franchise.service;
+package com.example.merchant.service;
 
-import com.example.franchise.domain.User;
+import com.example.merchant.domain.User;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;

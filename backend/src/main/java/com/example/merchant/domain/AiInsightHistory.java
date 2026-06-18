@@ -1,11 +1,11 @@
-package com.example.franchise.domain;
+package com.example.merchant.domain;
 
 import java.time.Instant;
 import java.util.List;
 
 public class AiInsightHistory {
     private Long id;
-    private String franchiseId;
+    private String merchantId;
     private String createdBy;
     private String createdByName;
     private String salesMonth;
@@ -24,12 +24,12 @@ public class AiInsightHistory {
         this.id = id;
     }
 
-    public String getFranchiseId() {
-        return franchiseId;
+    public String getMerchantId() {
+        return merchantId;
     }
 
-    public void setFranchiseId(String franchiseId) {
-        this.franchiseId = franchiseId;
+    public void setMerchantId(String merchantId) {
+        this.merchantId = merchantId;
     }
 
     public String getCreatedBy() {

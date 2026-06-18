@@ -21,7 +21,7 @@ function App() {
   });
 
   const [usersData, setUsersData] = useState([]);
-  const [franchises, setFranchises] = useState([]);
+  const [merchants, setMerchants] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [averages, setAverages] = useState({ 
     industryAverages: {}, 
@@ -31,16 +31,16 @@ function App() {
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'admin'
   const [selectedRegion, setSelectedRegion] = useState('전체');
   const [selectedIndustry, setSelectedIndustry] = useState('전체');
-  const [selectedFranchiseId, setSelectedFranchiseId] = useState(null);
+  const [selectedMerchantId, setSelectedMerchantId] = useState(null);
   const [showAlerts, setShowAlerts] = useState(false);
 
   const handleLogout = () => {
     api.logout();
     setCurrentUser(null);
     setUsersData([]);
-    setSelectedFranchiseId(null);
+    setSelectedMerchantId(null);
     setCurrentView('dashboard');
-    setFranchises([]);
+    setMerchants([]);
     setAlerts([]);
   };
 
@@ -52,8 +52,8 @@ function App() {
     }
 
     try {
-      const franchiseList = await api.getFranchises();
-      setFranchises(franchiseList);
+      const merchantList = await api.getMerchants();
+      setMerchants(merchantList);
 
       const alertList = await api.getAlerts();
       setAlerts(alertList);
@@ -94,19 +94,19 @@ function App() {
     setCurrentUser(user);
   };
 
-  // Filter franchises in frontend for region & industry selections
-  const filteredFranchises = franchises.filter(f => {
+  // Filter merchants in frontend for region & industry selections
+  const filteredMerchants = merchants.filter(f => {
     const regionMatch = selectedRegion === '전체' || f.region === selectedRegion;
     const industryMatch = selectedIndustry === '전체' || f.industry === selectedIndustry;
     return regionMatch && industryMatch;
   });
 
-  const filteredFranchiseIds = new Set(filteredFranchises.map(franchise => franchise.id));
-  const visibleAlerts = alerts.filter(alert => filteredFranchiseIds.has(alert.franchiseId));
+  const filteredMerchantIds = new Set(filteredMerchants.map(merchant => merchant.id));
+  const visibleAlerts = alerts.filter(alert => filteredMerchantIds.has(alert.merchantId));
   const checkRequiredCount = visibleAlerts.filter(alert => alert.riskLevel === 'CHECK_REQUIRED').length;
   const cautionCount = visibleAlerts.filter(alert => alert.riskLevel === 'CAUTION').length;
 
-  const selectedFranchise = franchises.find(f => f.id === selectedFranchiseId);
+  const selectedMerchant = merchants.find(f => f.id === selectedMerchantId);
 
   if (!currentUser) {
     return <Login usersData={usersData} onLogin={handleLogin} />;
@@ -116,7 +116,7 @@ function App() {
     return (
       <AdminPage 
         usersData={usersData} 
-        franchises={franchises} 
+        merchants={merchants} 
         onRefresh={loadData} 
         onClose={() => setCurrentView('dashboard')} 
       />
@@ -130,7 +130,7 @@ function App() {
         <div className="card">
           <div className="metric-label">총 매출 (만원)</div>
           <div className="metric-value">{(() => {
-            const total = filteredFranchises.reduce((sum, fr) => {
+            const total = filteredMerchants.reduce((sum, fr) => {
               const latest = fr.monthlySales?.[fr.monthlySales.length - 1]?.sales || 0;
               return sum + latest;
             }, 0);
@@ -140,7 +140,7 @@ function App() {
         <div className="card">
           <div className="metric-label">전월 대비 성장률</div>
           <div className="metric-value">{(() => {
-            const rates = filteredFranchises.map(fr => {
+            const rates = filteredMerchants.map(fr => {
               const ms = fr.monthlySales;
               if (ms && ms.length >= 2) {
                 const latest = ms[ms.length - 1].sales;
@@ -155,16 +155,16 @@ function App() {
         </div>
         <div className="card">
           <div className="metric-label">담당 가맹점 수</div>
-          <div className="metric-value">{filteredFranchises.length}개</div>
+          <div className="metric-value">{filteredMerchants.length}개</div>
         </div>
         <div className="card">
           <div className="metric-label">평균 객단가 (만원)</div>
           <div className="metric-value">{(() => {
-            const tickets = filteredFranchises.reduce((sum, fr) => {
+            const tickets = filteredMerchants.reduce((sum, fr) => {
               const latest = fr.monthlySales?.[fr.monthlySales.length - 1]?.avgTicket || 0;
               return sum + latest;
             }, 0);
-            const avg = tickets / (filteredFranchises.length || 1);
+            const avg = tickets / (filteredMerchants.length || 1);
             return (avg / 10000).toFixed(2);
           })()}</div>
         </div>
@@ -182,7 +182,7 @@ function App() {
              isOpen={showAlerts}
              onToggle={() => setShowAlerts((open) => !open)}
              onClose={() => setShowAlerts(false)}
-             onSelectAlert={(alert) => setSelectedFranchiseId(alert.franchiseId)}
+             onSelectAlert={(alert) => setSelectedMerchantId(alert.merchantId)}
              riskLabels={RISK_LABELS}
            />
            {currentUser.role === 'ADMIN' && (
@@ -218,22 +218,22 @@ function App() {
         setSelectedRegion={setSelectedRegion}
         selectedIndustry={selectedIndustry}
         setSelectedIndustry={setSelectedIndustry}
-        franchisesCount={filteredFranchises.length}
-        franchises={filteredFranchises}
-        selectedFranchiseId={selectedFranchiseId}
-        setSelectedFranchiseId={setSelectedFranchiseId}
+        merchantsCount={filteredMerchants.length}
+        merchants={filteredMerchants}
+        selectedMerchantId={selectedMerchantId}
+        setSelectedMerchantId={setSelectedMerchantId}
         riskLabels={RISK_LABELS}
       />
         
         <MapArea 
-          franchises={filteredFranchises} 
-          onMarkerClick={setSelectedFranchiseId} 
-          selectedFranchiseId={selectedFranchiseId}
+          merchants={filteredMerchants} 
+          onMarkerClick={setSelectedMerchantId} 
+          selectedMerchantId={selectedMerchantId}
         />
         
         <DetailsPanel 
-          franchise={selectedFranchise} 
-          onClose={() => setSelectedFranchiseId(null)}
+          merchant={selectedMerchant} 
+          onClose={() => setSelectedMerchantId(null)}
           averages={averages}
           currentUser={currentUser}
         />

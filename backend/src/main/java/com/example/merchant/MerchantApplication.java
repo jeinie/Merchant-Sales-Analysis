@@ -1,13 +1,13 @@
-package com.example.franchise;
+package com.example.merchant;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class FranchiseApplication {
+public class MerchantApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(FranchiseApplication.class, args);
+		SpringApplication.run(MerchantApplication.class, args);
 	}
 
 }

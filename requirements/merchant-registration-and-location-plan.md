@@ -6,13 +6,13 @@
 
 - 관리자 페이지에서 가맹점별 담당 영업사원 선택 가능
 - `POST /api/admin/assign-manager` API로 담당자 배정 변경
-- `user_franchise_assignments` 테이블로 영업사원과 가맹점 관계 저장
+- `user_merchant_assignments` 테이블로 영업사원과 가맹점 관계 저장
 
 하지만 관리자가 신규 가맹점을 직접 등록하는 기능은 아직 없다. 현재 가맹점 데이터는 `data.sql` 또는 DB 직접 입력을 전제로 한다.
 
 지도 표시 방식은 다음 순서로 단순화한다.
 
-1. `franchises.latitude`, `franchises.longitude` 값이 있으면 해당 좌표로 마커 표시
+1. `merchants.latitude`, `merchants.longitude` 값이 있으면 해당 좌표로 마커 표시
 2. 좌표가 없으면 지도에서 자동 지오코딩하지 않음
 3. 좌표가 없는 가맹점은 지도에 표시하지 않고 미확인 매장 수로 집계
 4. 좌표 생성과 검증은 관리자 등록·수정 화면에서 처리
@@ -151,10 +151,10 @@
 
 ## 6. DB 변경안
 
-기존 `franchises` 테이블에 위치 검증 상태를 추가한다.
+기존 `merchants` 테이블에 위치 검증 상태를 추가한다.
 
 ```sql
-ALTER TABLE franchises
+ALTER TABLE merchants
     ADD COLUMN location_status VARCHAR(20) NOT NULL DEFAULT 'UNVERIFIED' COMMENT '위치 좌표 검증 상태',
     ADD COLUMN geocoded_at TIMESTAMP NULL COMMENT '주소 기반 좌표 산출 시각',
     ADD COLUMN geocode_source VARCHAR(50) COMMENT '좌표 산출 출처',
@@ -166,17 +166,17 @@ ALTER TABLE franchises
 ```sql
 CREATE TABLE assignment_histories (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '담당자 배정 이력 ID',
-    franchise_id VARCHAR(20) NOT NULL COMMENT '가맹점 ID',
+    merchant_id VARCHAR(20) NOT NULL COMMENT '가맹점 ID',
     previous_user_id VARCHAR(64) COMMENT '변경 전 담당 사용자 ID',
     new_user_id VARCHAR(64) COMMENT '변경 후 담당 사용자 ID',
     changed_by VARCHAR(64) NOT NULL COMMENT '변경을 수행한 관리자 ID',
     change_reason VARCHAR(255) COMMENT '담당자 변경 사유',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '담당자 변경 시각',
     PRIMARY KEY (id),
-    KEY idx_assignment_history_franchise (franchise_id, created_at),
+    KEY idx_assignment_history_merchant (merchant_id, created_at),
     KEY idx_assignment_history_user (new_user_id, created_at),
-    CONSTRAINT fk_assignment_history_franchise
-        FOREIGN KEY (franchise_id) REFERENCES franchises (id)
+    CONSTRAINT fk_assignment_history_merchant
+        FOREIGN KEY (merchant_id) REFERENCES merchants (id)
         ON DELETE CASCADE,
     CONSTRAINT fk_assignment_history_changed_by
         FOREIGN KEY (changed_by) REFERENCES users (id)
@@ -189,7 +189,7 @@ CREATE TABLE assignment_histories (
 ### 7.1 가맹점 등록
 
 ```http
-POST /api/admin/franchises
+POST /api/admin/merchants
 ```
 
 요청 예시:
@@ -212,14 +212,14 @@ POST /api/admin/franchises
 - 관리자 권한 검증
 - 필수값 검증
 - 가맹점 ID 자동 생성 또는 중복 검증
-- `franchises` 저장
-- `managerId`가 있으면 `user_franchise_assignments` 저장
+- `merchants` 저장
+- `managerId`가 있으면 `user_merchant_assignments` 저장
 - 배정 이력 저장
 
 ### 7.2 가맹점 수정
 
 ```http
-PUT /api/admin/franchises/{franchiseId}
+PUT /api/admin/merchants/{merchantId}
 ```
 
 수정 가능 항목:
@@ -237,7 +237,7 @@ PUT /api/admin/franchises/{franchiseId}
 ### 7.3 위치 재검증
 
 ```http
-POST /api/admin/franchises/{franchiseId}/geocode
+POST /api/admin/merchants/{merchantId}/geocode
 ```
 
 처리:

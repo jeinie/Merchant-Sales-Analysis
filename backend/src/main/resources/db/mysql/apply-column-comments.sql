@@ -12,8 +12,8 @@ ALTER TABLE users
     MODIFY created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '사용자 계정 생성 시각',
     MODIFY updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '사용자 계정 최종 수정 시각';
 
-ALTER TABLE franchises COMMENT = '가맹점 기본 정보';
-ALTER TABLE franchises
+ALTER TABLE merchant COMMENT = '가맹점 기본 정보';
+ALTER TABLE merchant
     MODIFY id VARCHAR(20) NOT NULL COMMENT '가맹점 고유 ID',
     MODIFY name VARCHAR(120) NOT NULL COMMENT '가맹점명',
     MODIFY industry VARCHAR(60) NOT NULL COMMENT '가맹점 업종',
@@ -34,7 +34,7 @@ ALTER TABLE franchises
 ALTER TABLE monthly_sales COMMENT = '가맹점별 월간 매출 지표';
 ALTER TABLE monthly_sales
     MODIFY id BIGINT NOT NULL AUTO_INCREMENT COMMENT '월별 매출 데이터 고유 ID',
-    MODIFY franchise_id VARCHAR(20) NOT NULL COMMENT '매출 데이터가 속한 가맹점 ID',
+    MODIFY merchant_id VARCHAR(20) NOT NULL COMMENT '매출 데이터가 속한 가맹점 ID',
     MODIFY sales_month CHAR(7) NOT NULL COMMENT '매출 기준 월: YYYY-MM 형식',
     MODIFY sales BIGINT NOT NULL COMMENT '해당 월 총 매출액',
     MODIFY tx_count INT NOT NULL COMMENT '해당 월 결제 건수',
@@ -42,16 +42,16 @@ ALTER TABLE monthly_sales
     MODIFY created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '월별 매출 데이터 생성 시각',
     MODIFY updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '월별 매출 데이터 최종 수정 시각';
 
-ALTER TABLE user_franchise_assignments COMMENT = '영업 담당자와 가맹점 배정 관계';
-ALTER TABLE user_franchise_assignments
+ALTER TABLE user_merchant_assignments COMMENT = '영업 담당자와 가맹점 배정 관계';
+ALTER TABLE user_merchant_assignments
     MODIFY user_id VARCHAR(64) NOT NULL COMMENT '담당 사용자 ID',
-    MODIFY franchise_id VARCHAR(20) NOT NULL COMMENT '담당 가맹점 ID',
+    MODIFY merchant_id VARCHAR(20) NOT NULL COMMENT '담당 가맹점 ID',
     MODIFY created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '담당 배정 생성 시각';
 
 ALTER TABLE ai_insight_histories COMMENT = '가맹점별 AI 운영 인사이트 생성 이력';
 ALTER TABLE ai_insight_histories
     MODIFY id BIGINT NOT NULL AUTO_INCREMENT COMMENT 'AI 분석 이력 고유 ID',
-    MODIFY franchise_id VARCHAR(20) NOT NULL COMMENT 'AI 분석 대상 가맹점 ID',
+    MODIFY merchant_id VARCHAR(20) NOT NULL COMMENT 'AI 분석 대상 가맹점 ID',
     MODIFY created_by VARCHAR(64) NOT NULL COMMENT 'AI 분석을 생성한 사용자 ID',
     MODIFY sales_month CHAR(7) NOT NULL COMMENT 'AI 분석 기준 매출 월: YYYY-MM 형식',
     MODIFY risk_level VARCHAR(20) NOT NULL COMMENT '분석 생성 시점의 가맹점 위험 등급',

@@ -1,4 +1,4 @@
-package com.example.franchise.domain;
+package com.example.merchant.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -11,7 +11,7 @@ public class User {
     private String passwordHash;
     private String name;
     private String role;
-    private List<String> assignedFranchiseIds;
+    private List<String> assignedMerchantIds;
     private Map<String, Object> permissions;
 
     public String getId() {
@@ -46,12 +46,12 @@ public class User {
         this.role = role;
     }
 
-    public List<String> getAssignedFranchiseIds() {
-        return assignedFranchiseIds;
+    public List<String> getAssignedMerchantIds() {
+        return assignedMerchantIds;
     }
 
-    public void setAssignedFranchiseIds(List<String> assignedFranchiseIds) {
-        this.assignedFranchiseIds = assignedFranchiseIds;
+    public void setAssignedMerchantIds(List<String> assignedMerchantIds) {
+        this.assignedMerchantIds = assignedMerchantIds;
     }
 
     public Map<String, Object> getPermissions() {

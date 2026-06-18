@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCircle2, MapPin, Plus, Save, Search, X } from 'lucide-react';
+import { Ban, CheckCircle2, History, MapPin, Pencil, Plus, Save, Search, X } from 'lucide-react';
 import { api } from '../utils/api';
 
 const KAKAO_MAP_SDK_ID = 'kakao-map-sdk';
@@ -68,55 +68,66 @@ const panelStyle = {
   boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
 };
 
-const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
-  const [activeTab, setActiveTab] = useState('franchises');
+const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
+  const [activeTab, setActiveTab] = useState('merchants');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingMerchant, setEditingMerchant] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [coordinates, setCoordinates] = useState(null);
   const [locationStatus, setLocationStatus] = useState('UNVERIFIED');
   const [formError, setFormError] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [closingFranchiseId, setClosingFranchiseId] = useState('');
+  const [closingMerchantId, setClosingMerchantId] = useState('');
   const [placeCandidates, setPlaceCandidates] = useState([]);
   const [locationLookupSource, setLocationLookupSource] = useState('');
+  const [assignmentHistories, setAssignmentHistories] = useState([]);
+  const [isLoadingHistories, setIsLoadingHistories] = useState(false);
+  const [mapSdkReady, setMapSdkReady] = useState(!!window.kakao?.maps?.services);
   const previewMapRef = useRef(null);
   const mapContainerRef = useRef(null);
   const markerRef = useRef(null);
 
   const salesUsers = usersData.filter(u => u.role === 'SALES');
-  const unresolvedCount = franchises.filter(franchise => !franchise.latitude || !franchise.longitude).length;
-  const hasCoordinates = (franchise) => franchise.latitude != null && franchise.longitude != null;
-  const getLocationStatusLabel = (franchise) => {
-    if (hasCoordinates(franchise) && franchise.locationStatus === 'UNVERIFIED') {
+  const unresolvedCount = merchants.filter(merchant => !merchant.latitude || !merchant.longitude).length;
+  const hasCoordinates = (merchant) => merchant.latitude != null && merchant.longitude != null;
+  const getLocationStatusLabel = (merchant) => {
+    if (hasCoordinates(merchant) && merchant.locationStatus === 'UNVERIFIED') {
       return statusLabel.GEOCODED;
     }
-    return statusLabel[franchise.locationStatus] || (hasCoordinates(franchise) ? statusLabel.GEOCODED : statusLabel.UNVERIFIED);
+    return statusLabel[merchant.locationStatus] || (hasCoordinates(merchant) ? statusLabel.GEOCODED : statusLabel.UNVERIFIED);
   };
   const industryOptions = useMemo(() => {
     const values = new Set(defaultIndustryOptions);
-    franchises.forEach(franchise => {
-      if (franchise.industry) values.add(franchise.industry);
+    merchants.forEach(merchant => {
+      if (merchant.industry) values.add(merchant.industry);
     });
     return Array.from(values).sort((left, right) => left.localeCompare(right, 'ko'));
-  }, [franchises]);
+  }, [merchants]);
   const regionOptions = useMemo(() => {
     const values = new Set(defaultRegionOptions);
-    franchises.forEach(franchise => {
-      if (franchise.region) values.add(franchise.region);
+    merchants.forEach(merchant => {
+      if (merchant.region) values.add(merchant.region);
     });
     return Array.from(values).sort((left, right) => left.localeCompare(right, 'ko'));
-  }, [franchises]);
+  }, [merchants]);
 
-  const managerByFranchiseId = useMemo(() => {
+  const managerByMerchantId = useMemo(() => {
     const result = new Map();
     salesUsers.forEach(user => {
-      user.assignedFranchiseIds?.forEach(franchiseId => {
-        result.set(franchiseId, user.id);
+      user.assignedMerchantIds?.forEach(merchantId => {
+        result.set(merchantId, user.id);
       });
     });
     return result;
   }, [salesUsers]);
+
+  useEffect(() => {
+    if (!isCreateOpen || !coordinates || window.kakao?.maps?.services) return;
+    loadKakaoMaps()
+      .then(() => setMapSdkReady(true))
+      .catch(err => setFormError(err.message));
+  }, [coordinates, isCreateOpen]);
 
   useEffect(() => {
     if (!isCreateOpen || !coordinates || !mapContainerRef.current || !window.kakao?.maps) return;
@@ -148,10 +159,32 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
     requestAnimationFrame(syncPreviewMapLayout);
     const timerId = window.setTimeout(syncPreviewMapLayout, 120);
     return () => window.clearTimeout(timerId);
-  }, [coordinates, isCreateOpen]);
+  }, [coordinates, isCreateOpen, mapSdkReady]);
+
+  useEffect(() => {
+    if (activeTab !== 'assignmentHistory') return;
+
+    let cancelled = false;
+    setIsLoadingHistories(true);
+    api.getAssignmentHistories()
+      .then(histories => {
+        if (!cancelled) setAssignmentHistories(histories);
+      })
+      .catch(err => {
+        if (!cancelled) alert(err.message || '담당자 배정 이력을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingHistories(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
   const closeCreateModal = () => {
     setIsCreateOpen(false);
+    setEditingMerchant(null);
     setForm(emptyForm);
     setCoordinates(null);
     setLocationStatus('UNVERIFIED');
@@ -162,9 +195,40 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
     markerRef.current = null;
   };
 
+  const openCreateModal = () => {
+    setEditingMerchant(null);
+    setForm(emptyForm);
+    setCoordinates(null);
+    setLocationStatus('UNVERIFIED');
+    setPlaceCandidates([]);
+    setLocationLookupSource('');
+    setFormError('');
+    setIsCreateOpen(true);
+  };
+
+  const openEditModal = (merchant) => {
+    setEditingMerchant(merchant);
+    setForm({
+      name: merchant.name || '',
+      industry: merchant.industry || '',
+      region: merchant.region || '',
+      address: merchant.address || '',
+      managerId: managerByMerchantId.get(merchant.id) || '',
+    });
+    setCoordinates(hasCoordinates(merchant) ? {
+      latitude: Number(merchant.latitude),
+      longitude: Number(merchant.longitude),
+    } : null);
+    setLocationStatus(merchant.locationStatus || (hasCoordinates(merchant) ? 'GEOCODED' : 'UNVERIFIED'));
+    setPlaceCandidates([]);
+    setLocationLookupSource(merchant.geocodeSource || '');
+    setFormError('');
+    setIsCreateOpen(true);
+  };
+
   const updateForm = (key, value) => {
     setForm(prev => ({ ...prev, [key]: value }));
-    if (key === 'address' || key === 'name') {
+    if (key === 'address') {
       setCoordinates(null);
       setLocationStatus('UNVERIFIED');
       setPlaceCandidates([]);
@@ -224,6 +288,7 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
     setPlaceCandidates([]);
     try {
       const kakao = await loadKakaoMaps();
+      setMapSdkReady(true);
 
       if (address) {
         const addressResult = await searchAddress(kakao, address);
@@ -263,7 +328,7 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
     applyLocationCandidate(candidate);
   };
 
-  const handleCreateFranchise = async (event) => {
+  const handleCreateMerchant = async (event) => {
     event.preventDefault();
     setFormError('');
 
@@ -274,42 +339,54 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
 
     setIsSaving(true);
     try {
-      await api.createFranchise({
+      const payload = {
         ...form,
         latitude: coordinates?.latitude ?? null,
         longitude: coordinates?.longitude ?? null,
         locationStatus: coordinates ? locationStatus : 'UNVERIFIED',
         geocodeSource: coordinates ? locationLookupSource || 'KAKAO_FRONTEND_LOOKUP' : '',
-        locationNote: coordinates ? '관리자가 등록 화면에서 카카오 위치 검색으로 좌표를 확인했습니다.' : '등록 시 좌표를 확인하지 않았습니다.',
-      });
+        locationNote: coordinates
+          ? (editingMerchant ? '관리자가 수정 화면에서 위치를 확인하거나 보정했습니다.' : '관리자가 등록 화면에서 카카오 위치 검색으로 좌표를 확인했습니다.')
+          : (editingMerchant ? '관리자가 수정 화면에서 좌표를 미확인 상태로 저장했습니다.' : '등록 시 좌표를 확인하지 않았습니다.'),
+      };
+
+      if (editingMerchant) {
+        await api.updateMerchant(editingMerchant.id, payload);
+        const previousManagerId = managerByMerchantId.get(editingMerchant.id) || '';
+        if (previousManagerId !== form.managerId) {
+          await api.assignManager(editingMerchant.id, form.managerId, '가맹점 수정 화면에서 담당자를 변경했습니다.');
+        }
+      } else {
+        await api.createMerchant(payload);
+      }
       if (onRefresh) await onRefresh();
       closeCreateModal();
     } catch (err) {
-      setFormError(err.message || '가맹점 등록에 실패했습니다.');
+      setFormError(err.message || (editingMerchant ? '가맹점 수정에 실패했습니다.' : '가맹점 등록에 실패했습니다.'));
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleCloseFranchise = async (franchise) => {
-    const confirmed = window.confirm(`${franchise.name} 가맹점을 폐점 처리할까요?\n목록과 지도에서는 숨겨지지만 매출 데이터와 AI 분석 이력은 보존됩니다.`);
+  const handleCloseMerchant = async (merchant) => {
+    const confirmed = window.confirm(`${merchant.name} 가맹점을 폐점 처리할까요?\n목록과 지도에서는 숨겨지지만 매출 데이터와 AI 분석 이력은 보존됩니다.`);
     if (!confirmed) return;
 
-    setClosingFranchiseId(franchise.id);
+    setClosingMerchantId(merchant.id);
     try {
-      await api.closeFranchise(franchise.id, '관리자 화면에서 폐점 처리했습니다.');
+      await api.closeMerchant(merchant.id, '관리자 화면에서 폐점 처리했습니다.');
       if (onRefresh) await onRefresh();
     } catch (err) {
       alert(err.message || '가맹점 폐점 처리에 실패했습니다.');
     } finally {
-      setClosingFranchiseId('');
+      setClosingMerchantId('');
     }
   };
 
-  const handleFranchiseChange = async (franchiseId, e) => {
+  const handleMerchantChange = async (merchantId, e) => {
     const newUserId = e.target.value;
     try {
-      await api.assignManager(franchiseId, newUserId);
+      await api.assignManager(merchantId, newUserId, '담당자 배정 탭에서 담당자를 변경했습니다.');
       if (onRefresh) onRefresh();
     } catch (err) {
       alert(err.message || '담당자 할당에 실패했습니다.');
@@ -354,8 +431,9 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {[
-          ['franchises', '가맹점 관리'],
+          ['merchants', '가맹점 관리'],
           ['assignments', '담당자 배정'],
+          ['assignmentHistory', '담당자 이력'],
           ['permissions', '권한 관리'],
         ].map(([key, label]) => (
           <button
@@ -377,7 +455,7 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
         ))}
       </div>
 
-      {activeTab === 'franchises' && (
+      {activeTab === 'merchants' && (
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
             <div>
@@ -388,7 +466,7 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
             </div>
             <button
               type="button"
-              onClick={() => setIsCreateOpen(true)}
+              onClick={openCreateModal}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -418,14 +496,14 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
               </tr>
             </thead>
             <tbody>
-              {franchises.map(franchise => (
-                <tr key={franchise.id}>
+              {merchants.map(merchant => (
+                <tr key={merchant.id}>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', fontWeight: 700 }}>
-                    {franchise.name}
-                    <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.78rem', fontWeight: 500 }}>{franchise.address}</div>
+                    {merchant.name}
+                    <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.78rem', fontWeight: 500 }}>{merchant.address}</div>
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#6b7280', fontSize: '0.85rem' }}>
-                    {franchise.region} / {franchise.industry}
+                    {merchant.region} / {merchant.industry}
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6' }}>
                     <span style={{
@@ -434,23 +512,43 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
                       gap: '5px',
                       padding: '4px 8px',
                       borderRadius: '999px',
-                      backgroundColor: hasCoordinates(franchise) ? '#ecfdf5' : '#fff7ed',
-                      color: hasCoordinates(franchise) ? '#047857' : '#c2410c',
+                      backgroundColor: hasCoordinates(merchant) ? '#ecfdf5' : '#fff7ed',
+                      color: hasCoordinates(merchant) ? '#047857' : '#c2410c',
                       fontSize: '0.75rem',
                       fontWeight: 800,
                     }}>
                       <MapPin size={13} />
-                      {getLocationStatusLabel(franchise)}
+                      {getLocationStatusLabel(merchant)}
                     </span>
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569', fontSize: '0.85rem' }}>
-                    {salesUsers.find(user => user.id === managerByFranchiseId.get(franchise.id))?.name || '미배정'}
+                    {salesUsers.find(user => user.id === managerByMerchantId.get(merchant.id))?.name || '미배정'}
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', textAlign: 'right' }}>
                     <button
                       type="button"
-                      onClick={() => handleCloseFranchise(franchise)}
-                      disabled={closingFranchiseId === franchise.id}
+                      onClick={() => openEditModal(merchant)}
+                      title="가맹점 수정 및 위치 보정"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '34px',
+                        height: '34px',
+                        marginRight: '6px',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '8px',
+                        backgroundColor: '#eff6ff',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCloseMerchant(merchant)}
+                      disabled={closingMerchantId === merchant.id}
                       title="폐점 처리"
                       style={{
                         display: 'inline-flex',
@@ -460,9 +558,9 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
                         height: '34px',
                         border: '1px solid #fecaca',
                         borderRadius: '8px',
-                        backgroundColor: closingFranchiseId === franchise.id ? '#fee2e2' : '#fff1f2',
+                        backgroundColor: closingMerchantId === merchant.id ? '#fee2e2' : '#fff1f2',
                         color: '#dc2626',
-                        cursor: closingFranchiseId === franchise.id ? 'wait' : 'pointer',
+                        cursor: closingMerchantId === merchant.id ? 'wait' : 'pointer',
                       }}
                     >
                       <Ban size={16} />
@@ -493,18 +591,18 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
               </tr>
             </thead>
             <tbody>
-              {franchises.map(franchise => (
-                <tr key={franchise.id}>
+              {merchants.map(merchant => (
+                <tr key={merchant.id}>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', fontWeight: '500' }}>
-                    {franchise.name}
+                    {merchant.name}
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#6b7280', fontSize: '0.85rem' }}>
-                    {franchise.region} / {franchise.industry}
+                    {merchant.region} / {merchant.industry}
                   </td>
                   <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6' }}>
                     <select
-                      value={managerByFranchiseId.get(franchise.id) || ''}
-                      onChange={(e) => handleFranchiseChange(franchise.id, e)}
+                      value={managerByMerchantId.get(merchant.id) || ''}
+                      onChange={(e) => handleMerchantChange(merchant.id, e)}
                       style={{
                         padding: '6px',
                         borderRadius: '4px',
@@ -518,6 +616,65 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
                         <option key={user.id} value={user.id}>{user.name}</option>
                       ))}
                     </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'assignmentHistory' && (
+        <div style={panelStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', borderBottom: '2px solid #f3f4f6', paddingBottom: '10px' }}>
+            <History size={18} color="#2563eb" />
+            <h3 style={{ margin: 0, color: '#1f2937' }}>담당자 배정 이력</h3>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '15px' }}>
+            신규 등록 또는 담당자 변경 시 이전 담당자와 신규 담당자, 변경한 관리자를 기록합니다.
+          </p>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', fontSize: '0.9rem' }}>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>변경 시각</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>가맹점</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>이전 담당자</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>신규 담당자</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>변경자</th>
+                <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>사유</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoadingHistories && (
+                <tr>
+                  <td colSpan="6" style={{ padding: '18px', textAlign: 'center', color: '#64748b' }}>이력을 불러오는 중입니다.</td>
+                </tr>
+              )}
+              {!isLoadingHistories && assignmentHistories.length === 0 && (
+                <tr>
+                  <td colSpan="6" style={{ padding: '18px', textAlign: 'center', color: '#64748b' }}>아직 담당자 변경 이력이 없습니다.</td>
+                </tr>
+              )}
+              {!isLoadingHistories && assignmentHistories.map(history => (
+                <tr key={history.id}>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#64748b', fontSize: '0.82rem' }}>
+                    {history.createdAt ? new Date(history.createdAt).toLocaleString('ko-KR') : '-'}
+                  </td>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', fontWeight: 700 }}>
+                    {history.merchantName || history.merchantId}
+                  </td>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569' }}>
+                    {history.previousUserName || history.previousUserId || '미배정'}
+                  </td>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569' }}>
+                    {history.newUserName || history.newUserId || '미배정'}
+                  </td>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569' }}>
+                    {history.changedByName || history.changedBy}
+                  </td>
+                  <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#64748b', fontSize: '0.84rem' }}>
+                    {history.changeReason || '-'}
                   </td>
                 </tr>
               ))}
@@ -588,7 +745,7 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
           }}
         >
           <form
-            onSubmit={handleCreateFranchise}
+            onSubmit={handleCreateMerchant}
             onClick={(event) => event.stopPropagation()}
             style={{
               width: 'min(920px, 100%)',
@@ -602,10 +759,14 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '18px 20px', borderBottom: '1px solid #e2e8f0' }}>
               <div>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 800 }}>신규 가맹점</div>
-                <h3 style={{ margin: '4px 0 0', color: '#0f172a' }}>가맹점 등록</h3>
+                <div style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 800 }}>
+                  {editingMerchant ? '가맹점 정보 수정' : '신규 가맹점'}
+                </div>
+                <h3 style={{ margin: '4px 0 0', color: '#0f172a' }}>
+                  {editingMerchant ? '가맹점 수정 및 위치 보정' : '가맹점 등록'}
+                </h3>
               </div>
-              <button type="button" onClick={closeCreateModal} aria-label="등록 닫기" className="icon-button">
+              <button type="button" onClick={closeCreateModal} aria-label="닫기" className="icon-button">
                 <X size={18} />
               </button>
             </div>
@@ -756,8 +917,29 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
                   )}
                 </div>
                 {coordinates && (
-                  <div style={{ color: '#64748b', fontSize: '0.78rem', lineHeight: 1.5 }}>
-                    위도 {coordinates.latitude.toFixed(7)} / 경도 {coordinates.longitude.toFixed(7)}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center', color: '#64748b', fontSize: '0.78rem', lineHeight: 1.5 }}>
+                    <span>위도 {coordinates.latitude.toFixed(7)} / 경도 {coordinates.longitude.toFixed(7)}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCoordinates(null);
+                        setLocationStatus('UNVERIFIED');
+                        setLocationLookupSource('');
+                        setPlaceCandidates([]);
+                      }}
+                      style={{
+                        border: '1px solid #fed7aa',
+                        borderRadius: '8px',
+                        background: '#fff7ed',
+                        color: '#c2410c',
+                        cursor: 'pointer',
+                        fontWeight: 800,
+                        padding: '6px 8px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      좌표 미확인으로 변경
+                    </button>
                   </div>
                 )}
               </div>
@@ -784,7 +966,7 @@ const AdminPage = ({ usersData, franchises, onRefresh, onClose }) => {
                 }}
               >
                 <Save size={16} />
-                {isSaving ? '저장 중' : '등록'}
+                {isSaving ? '저장 중' : (editingMerchant ? '수정 저장' : '등록')}
               </button>
             </div>
           </form>

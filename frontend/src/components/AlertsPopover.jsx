@@ -99,7 +99,7 @@ const AlertsPopover = ({
           ) : (
             <ul className="alert-list">
               {filteredAlerts.map((alert) => (
-                <li key={alert.franchiseId}>
+                <li key={alert.merchantId}>
                   <button type="button" onClick={() => handleSelect(alert)}>
                     <div className="alert-row-header">
                       <span className={`risk-badge ${alert.riskLevel?.toLowerCase()}`}>
@@ -110,7 +110,7 @@ const AlertsPopover = ({
 
                     <div className="alert-item-title">
                       <AlertTriangle size={16} strokeWidth={2.2} />
-                      <strong>{alert.franchiseName}</strong>
+                      <strong>{alert.merchantName}</strong>
                       <ChevronRight size={15} strokeWidth={2.2} />
                     </div>
 
