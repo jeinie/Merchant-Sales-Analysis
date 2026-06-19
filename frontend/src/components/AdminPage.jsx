@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Ban, CheckCircle2, History, MapPin, Pencil, Plus, Save, Search, X } from 'lucide-react';
+import { Ban, CheckCircle2, History, MapPin, Pencil, Plus, Save, Search, Upload, X } from 'lucide-react';
 import { api } from '../utils/api';
 
 const KAKAO_MAP_SDK_ID = 'kakao-map-sdk';
@@ -162,6 +162,9 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
   const [merchantStatusFilter, setMerchantStatusFilter] = useState('ACTIVE');
   const [adminMerchants, setAdminMerchants] = useState([]);
   const [isLoadingAdminMerchants, setIsLoadingAdminMerchants] = useState(false);
+  const [salesUploadPreview, setSalesUploadPreview] = useState(null);
+  const [isPreviewingSalesUpload, setIsPreviewingSalesUpload] = useState(false);
+  const [salesUploadError, setSalesUploadError] = useState('');
   const [placeCandidates, setPlaceCandidates] = useState([]);
   const [locationLookupSource, setLocationLookupSource] = useState('');
   const [assignmentHistories, setAssignmentHistories] = useState([]);
@@ -537,6 +540,29 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
     }
   };
 
+  const handleSalesUploadPreview = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    setSalesUploadPreview(null);
+    setSalesUploadError('');
+
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setSalesUploadError('CSV 파일만 업로드할 수 있습니다.');
+      return;
+    }
+
+    setIsPreviewingSalesUpload(true);
+    try {
+      const preview = await api.previewSalesUpload(file);
+      setSalesUploadPreview(preview);
+    } catch (err) {
+      setSalesUploadError(err.message || '매출 데이터 업로드 미리보기에 실패했습니다.');
+    } finally {
+      setIsPreviewingSalesUpload(false);
+    }
+  };
+
   return (
     <div style={{ height: '100vh', overflowY: 'auto', overflowX: 'hidden', padding: '20px 20px 48px', backgroundColor: '#f9fafb', fontFamily: "'Inter', sans-serif" }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '16px' }}>
@@ -565,6 +591,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
           ['merchants', '가맹점 관리'],
           ['assignments', '담당자 배정'],
           ['assignmentHistory', '담당자 이력'],
+          ['dataUpload', '데이터 업로드'],
           ['permissions', '권한 관리'],
         ].map(([key, label]) => (
           <button
@@ -871,6 +898,120 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'dataUpload' && (
+        <div style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+            <div>
+              <h3 style={{ margin: 0, color: '#1f2937' }}>매출 데이터 업로드</h3>
+              <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '0.86rem' }}>
+                CSV 파일을 반영하기 전에 필수 컬럼, 중복, 음수값, 객단가 불일치, 전월 대비 큰 변동을 미리 검증합니다.
+              </p>
+            </div>
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 12px',
+                border: 'none',
+                borderRadius: '8px',
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                cursor: isPreviewingSalesUpload ? 'wait' : 'pointer',
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Upload size={16} />
+              {isPreviewingSalesUpload ? '검증 중' : 'CSV 선택'}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleSalesUploadPreview}
+                disabled={isPreviewingSalesUpload}
+                style={{ display: 'none' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ padding: '12px', borderRadius: '8px', background: '#f8fafc', color: '#475569', fontSize: '0.84rem', lineHeight: 1.6, marginBottom: '14px' }}>
+            필수 헤더: <strong>merchantId, salesMonth, sales, txCount, avgTicket</strong>
+            <br />
+            예시: <code>M002,2026-06,12800000,420,30476</code>
+          </div>
+
+          {salesUploadError && (
+            <div style={{ padding: '10px 12px', borderRadius: '8px', background: '#fef2f2', color: '#b91c1c', fontSize: '0.85rem', fontWeight: 700, marginBottom: '14px' }}>
+              {salesUploadError}
+            </div>
+          )}
+
+          {salesUploadPreview && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+                {[
+                  ['전체 행', salesUploadPreview.summary.totalRows],
+                  ['반영 가능', salesUploadPreview.summary.validRows],
+                  ['오류 행', salesUploadPreview.summary.errorRows],
+                  ['경고 행', salesUploadPreview.summary.warningRows],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#ffffff' }}>
+                    <div style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 800 }}>{label}</div>
+                    <div style={{ marginTop: '4px', color: '#0f172a', fontSize: '1.35rem', fontWeight: 900 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', fontSize: '0.86rem' }}>
+                    <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>행</th>
+                    <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>상태</th>
+                    <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>가맹점</th>
+                    <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>월</th>
+                    <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>매출/거래/객단가</th>
+                    <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>검증 결과</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesUploadPreview.rows.map(row => {
+                    const statusStyle = row.status === 'ERROR'
+                      ? { background: '#fef2f2', color: '#b91c1c' }
+                      : row.status === 'WARNING'
+                        ? { background: '#fff7ed', color: '#c2410c' }
+                        : { background: '#ecfdf5', color: '#047857' };
+                    return (
+                      <tr key={row.rowNumber}>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#64748b' }}>{row.rowNumber}</td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6' }}>
+                          <span style={{ display: 'inline-flex', padding: '4px 8px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 900, ...statusStyle }}>
+                            {row.status === 'ERROR' ? '오류' : row.status === 'WARNING' ? '경고' : '정상'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', fontWeight: 700 }}>
+                          {row.merchantName || '-'}
+                          <div style={{ marginTop: '4px', color: '#64748b', fontSize: '0.78rem', fontWeight: 500 }}>{row.merchantId || '-'}</div>
+                        </td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569' }}>{row.salesMonth || '-'}</td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569', fontSize: '0.84rem', lineHeight: 1.5 }}>
+                          매출 {row.sales?.toLocaleString?.() ?? '-'}원<br />
+                          거래 {row.txCount?.toLocaleString?.() ?? '-'}건 / 객단가 {row.avgTicket?.toLocaleString?.() ?? '-'}원
+                        </td>
+                        <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569', fontSize: '0.84rem', lineHeight: 1.5 }}>
+                          {[...(row.errors || []), ...(row.warnings || [])].length > 0
+                            ? [...(row.errors || []), ...(row.warnings || [])].map((message, index) => <div key={`${row.rowNumber}-${index}`}>{message}</div>)
+                            : '문제 없음'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </>
+          )}
         </div>
       )}
 

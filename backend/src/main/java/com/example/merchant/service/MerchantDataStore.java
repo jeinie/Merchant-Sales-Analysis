@@ -3,6 +3,7 @@ package com.example.merchant.service;
 import com.example.merchant.domain.AiInsightHistory;
 import com.example.merchant.domain.AssignmentHistory;
 import com.example.merchant.domain.Merchant;
+import com.example.merchant.domain.MonthlySales;
 import com.example.merchant.domain.User;
 
 import java.util.List;
@@ -79,4 +80,6 @@ public interface MerchantDataStore {
             String locationNote);
 
     void toggleAi(String userId, boolean canUseAI);
+
+    int upsertMonthlySales(List<MonthlySales> monthlySales);
 }

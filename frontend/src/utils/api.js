@@ -25,8 +25,9 @@ const parseErrorMessage = async (response) => {
 
 const request = async (path, { method = 'GET', body, auth = true } = {}) => {
   const headers = {};
+  const isFormData = body instanceof FormData;
 
-  if (body) {
+  if (body && !isFormData) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -46,7 +47,7 @@ const request = async (path, { method = 'GET', body, auth = true } = {}) => {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
     });
   } catch (err) {
     const networkError = new Error('백엔드 서버에 연결할 수 없습니다. Spring Boot 서버가 실행 중인지 확인해주세요.');
@@ -198,6 +199,24 @@ export const api = {
 
   async getAssignmentHistories() {
     return request('/admin/assignment-histories');
+  },
+
+  async previewSalesUpload(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/admin/sales-upload/preview', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  async commitSalesUpload(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/admin/sales-upload/commit', {
+      method: 'POST',
+      body: formData,
+    });
   },
 
   async updateMerchantLocation(merchantId, payload) {

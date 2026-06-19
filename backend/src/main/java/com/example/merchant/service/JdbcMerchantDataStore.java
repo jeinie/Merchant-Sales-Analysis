@@ -734,6 +734,29 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
         }
     }
 
+    @Override
+    @Transactional
+    public int upsertMonthlySales(List<MonthlySales> monthlySales) {
+        int affectedRows = 0;
+        for (MonthlySales row : monthlySales) {
+            affectedRows += jdbcTemplate.update("""
+                            INSERT INTO monthly_sales (merchant_id, sales_month, sales, tx_count, avg_ticket)
+                            VALUES (?, ?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE
+                                sales = VALUES(sales),
+                                tx_count = VALUES(tx_count),
+                                avg_ticket = VALUES(avg_ticket),
+                                updated_at = CURRENT_TIMESTAMP
+                            """,
+                    row.getMerchantId(),
+                    row.getMonth(),
+                    row.getSales(),
+                    row.getTxCount(),
+                    row.getAvgTicket());
+        }
+        return affectedRows;
+    }
+
     private User findStoredUserById(String id) {
         try {
             return jdbcTemplate.queryForObject("""
