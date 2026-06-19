@@ -103,3 +103,18 @@ CREATE TABLE IF NOT EXISTS ai_insight_histories (
         FOREIGN KEY (created_by) REFERENCES users (id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='가맹점별 AI 운영 인사이트 생성 이력';
+CREATE TABLE IF NOT EXISTS sales_upload_histories (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Sales upload history ID',
+    file_name VARCHAR(255) NOT NULL COMMENT 'Uploaded CSV file name',
+    uploaded_by VARCHAR(64) NOT NULL COMMENT 'Admin user ID that committed the upload',
+    total_rows INT NOT NULL DEFAULT 0 COMMENT 'Total parsed CSV rows',
+    applied_rows INT NOT NULL DEFAULT 0 COMMENT 'Rows applied to monthly_sales',
+    warning_rows INT NOT NULL DEFAULT 0 COMMENT 'Rows applied with warnings',
+    status VARCHAR(30) NOT NULL COMMENT 'Upload status',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Upload committed time',
+    PRIMARY KEY (id),
+    KEY idx_sales_upload_created_at (created_at),
+    CONSTRAINT fk_sales_upload_user
+        FOREIGN KEY (uploaded_by) REFERENCES users (id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Sales CSV upload commit history';

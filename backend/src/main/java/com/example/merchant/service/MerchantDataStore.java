@@ -4,6 +4,7 @@ import com.example.merchant.domain.AiInsightHistory;
 import com.example.merchant.domain.AssignmentHistory;
 import com.example.merchant.domain.Merchant;
 import com.example.merchant.domain.MonthlySales;
+import com.example.merchant.domain.SalesUploadHistory;
 import com.example.merchant.domain.User;
 
 import java.util.List;
@@ -82,4 +83,14 @@ public interface MerchantDataStore {
     void toggleAi(String userId, boolean canUseAI);
 
     int upsertMonthlySales(List<MonthlySales> monthlySales);
+
+    SalesUploadHistory recordSalesUploadHistory(
+            String fileName,
+            String uploadedBy,
+            int totalRows,
+            int appliedRows,
+            int warningRows,
+            String status);
+
+    List<SalesUploadHistory> getSalesUploadHistories();
 }

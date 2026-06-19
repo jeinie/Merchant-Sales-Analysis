@@ -162,9 +162,13 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
   const [merchantStatusFilter, setMerchantStatusFilter] = useState('ACTIVE');
   const [adminMerchants, setAdminMerchants] = useState([]);
   const [isLoadingAdminMerchants, setIsLoadingAdminMerchants] = useState(false);
+  const [salesUploadFile, setSalesUploadFile] = useState(null);
   const [salesUploadPreview, setSalesUploadPreview] = useState(null);
   const [isPreviewingSalesUpload, setIsPreviewingSalesUpload] = useState(false);
+  const [isCommittingSalesUpload, setIsCommittingSalesUpload] = useState(false);
   const [salesUploadError, setSalesUploadError] = useState('');
+  const [salesUploadHistories, setSalesUploadHistories] = useState([]);
+  const [isLoadingSalesUploadHistories, setIsLoadingSalesUploadHistories] = useState(false);
   const [placeCandidates, setPlaceCandidates] = useState([]);
   const [locationLookupSource, setLocationLookupSource] = useState('');
   const [assignmentHistories, setAssignmentHistories] = useState([]);
@@ -222,9 +226,27 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
     }
   };
 
+  const loadSalesUploadHistories = async () => {
+    setIsLoadingSalesUploadHistories(true);
+    try {
+      const histories = await api.getSalesUploadHistories();
+      setSalesUploadHistories(histories);
+    } catch (err) {
+      alert(err.message || '매출 데이터 업로드 이력을 불러오지 못했습니다.');
+    } finally {
+      setIsLoadingSalesUploadHistories(false);
+    }
+  };
+
   useEffect(() => {
     loadAdminMerchants(merchantStatusFilter);
   }, [merchantStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'dataUpload') {
+      loadSalesUploadHistories();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!isCreateOpen || !coordinates || window.kakao?.maps?.services) return;
@@ -543,6 +565,7 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
   const handleSalesUploadPreview = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
+    setSalesUploadFile(null);
     setSalesUploadPreview(null);
     setSalesUploadError('');
 
@@ -555,11 +578,36 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
     setIsPreviewingSalesUpload(true);
     try {
       const preview = await api.previewSalesUpload(file);
+      setSalesUploadFile(file);
       setSalesUploadPreview(preview);
     } catch (err) {
       setSalesUploadError(err.message || '매출 데이터 업로드 미리보기에 실패했습니다.');
     } finally {
       setIsPreviewingSalesUpload(false);
+    }
+  };
+
+  const handleSalesUploadCommit = async () => {
+    if (!salesUploadFile || !salesUploadPreview) return;
+    if (salesUploadPreview.summary.errorRows > 0) {
+      setSalesUploadError('오류 행이 있는 CSV는 반영할 수 없습니다.');
+      return;
+    }
+
+    setIsCommittingSalesUpload(true);
+    setSalesUploadError('');
+    try {
+      await api.commitSalesUpload(salesUploadFile);
+      setSalesUploadFile(null);
+      setSalesUploadPreview(null);
+      await loadSalesUploadHistories();
+      await loadAdminMerchants();
+      if (onRefresh) await onRefresh();
+      alert('매출 데이터가 반영되었습니다.');
+    } catch (err) {
+      setSalesUploadError(err.message || '매출 데이터 반영에 실패했습니다.');
+    } finally {
+      setIsCommittingSalesUpload(false);
     }
   };
 
@@ -965,6 +1013,29 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
                 ))}
               </div>
 
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                <button
+                  type="button"
+                  onClick={handleSalesUploadCommit}
+                  disabled={!salesUploadFile || salesUploadPreview.summary.errorRows > 0 || isCommittingSalesUpload}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 12px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    backgroundColor: (!salesUploadFile || salesUploadPreview.summary.errorRows > 0 || isCommittingSalesUpload) ? '#cbd5e1' : '#0f766e',
+                    color: '#ffffff',
+                    cursor: (!salesUploadFile || salesUploadPreview.summary.errorRows > 0 || isCommittingSalesUpload) ? 'not-allowed' : 'pointer',
+                    fontWeight: 800,
+                  }}
+                >
+                  <Save size={16} />
+                  {isCommittingSalesUpload ? '반영 중' : '검증 결과 반영'}
+                </button>
+              </div>
+
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', fontSize: '0.86rem' }}>
@@ -1012,6 +1083,48 @@ const AdminPage = ({ usersData, merchants, onRefresh, onClose }) => {
               </table>
             </>
           )}
+
+          <div style={{ marginTop: '18px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+            <h4 style={{ margin: '0 0 10px', color: '#1f2937' }}>최근 반영 이력</h4>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f9fafb', color: '#4b5563', fontSize: '0.86rem' }}>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>반영 시각</th>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>파일명</th>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>업로드 사용자</th>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>행 수</th>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>경고</th>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #e5e7eb' }}>상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoadingSalesUploadHistories && (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '18px', textAlign: 'center', color: '#64748b' }}>이력을 불러오는 중입니다.</td>
+                  </tr>
+                )}
+                {!isLoadingSalesUploadHistories && salesUploadHistories.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '18px', textAlign: 'center', color: '#64748b' }}>아직 반영 이력이 없습니다.</td>
+                  </tr>
+                )}
+                {!isLoadingSalesUploadHistories && salesUploadHistories.map(history => (
+                  <tr key={history.id}>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#64748b', fontSize: '0.82rem' }}>{formatDateTime(history.createdAt)}</td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', fontWeight: 700 }}>{history.fileName}</td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569' }}>{history.uploadedByName || history.uploadedBy}</td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569' }}>{history.appliedRows?.toLocaleString?.() ?? 0} / {history.totalRows?.toLocaleString?.() ?? 0}</td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6', color: '#475569' }}>{history.warningRows?.toLocaleString?.() ?? 0}</td>
+                    <td style={{ padding: '12px 10px', borderBottom: '1px solid #f3f4f6' }}>
+                      <span style={{ display: 'inline-flex', padding: '4px 8px', borderRadius: '999px', background: '#ecfdf5', color: '#047857', fontSize: '0.75rem', fontWeight: 900 }}>
+                        {history.status === 'COMMITTED' ? '반영 완료' : history.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

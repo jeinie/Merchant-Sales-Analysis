@@ -4,6 +4,7 @@ import com.example.merchant.domain.AiInsightHistory;
 import com.example.merchant.domain.AssignmentHistory;
 import com.example.merchant.domain.Merchant;
 import com.example.merchant.domain.MonthlySales;
+import com.example.merchant.domain.SalesUploadHistory;
 import com.example.merchant.domain.User;
 import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.Profile;
@@ -49,6 +50,7 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
         ensureMerchantSchemaNames();
         ensureMerchantLocationColumns();
         ensureAssignmentHistorySchema();
+        ensureSalesUploadHistorySchema();
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS ai_insight_histories (
@@ -191,6 +193,26 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
                         ON DELETE SET NULL,
                     CONSTRAINT fk_assignment_history_changed_by
                         FOREIGN KEY (changed_by) REFERENCES users (id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+    }
+
+    private void ensureSalesUploadHistorySchema() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS sales_upload_histories (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    file_name VARCHAR(255) NOT NULL,
+                    uploaded_by VARCHAR(64) NOT NULL,
+                    total_rows INT NOT NULL DEFAULT 0,
+                    applied_rows INT NOT NULL DEFAULT 0,
+                    warning_rows INT NOT NULL DEFAULT 0,
+                    status VARCHAR(30) NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_sales_upload_created_at (created_at),
+                    CONSTRAINT fk_sales_upload_user
+                        FOREIGN KEY (uploaded_by) REFERENCES users (id)
                         ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
@@ -757,6 +779,55 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
         return affectedRows;
     }
 
+    @Override
+    public SalesUploadHistory recordSalesUploadHistory(
+            String fileName,
+            String uploadedBy,
+            int totalRows,
+            int appliedRows,
+            int warningRows,
+            String status) {
+        jdbcTemplate.update("""
+                        INSERT INTO sales_upload_histories
+                            (file_name, uploaded_by, total_rows, applied_rows, warning_rows, status)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                fileName,
+                uploadedBy,
+                totalRows,
+                appliedRows,
+                warningRows,
+                status);
+
+        Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        return loadSalesUploadHistoryById(id);
+    }
+
+    @Override
+    public List<SalesUploadHistory> getSalesUploadHistories() {
+        return jdbcTemplate.query("""
+                        SELECT h.id, h.file_name, h.uploaded_by, u.name AS uploaded_by_name,
+                               h.total_rows, h.applied_rows, h.warning_rows, h.status, h.created_at
+                        FROM sales_upload_histories h
+                        JOIN users u ON u.id = h.uploaded_by
+                        ORDER BY h.created_at DESC, h.id DESC
+                        LIMIT 50
+                        """,
+                this::mapSalesUploadHistory);
+    }
+
+    private SalesUploadHistory loadSalesUploadHistoryById(Long id) {
+        return jdbcTemplate.queryForObject("""
+                        SELECT h.id, h.file_name, h.uploaded_by, u.name AS uploaded_by_name,
+                               h.total_rows, h.applied_rows, h.warning_rows, h.status, h.created_at
+                        FROM sales_upload_histories h
+                        JOIN users u ON u.id = h.uploaded_by
+                        WHERE h.id = ?
+                        """,
+                this::mapSalesUploadHistory,
+                id);
+    }
+
     private User findStoredUserById(String id) {
         try {
             return jdbcTemplate.queryForObject("""
@@ -1047,6 +1118,22 @@ public class JdbcMerchantDataStore implements MerchantDataStore {
         history.setChangedBy(rs.getString("changed_by"));
         history.setChangedByName(rs.getString("changed_by_name"));
         history.setChangeReason(rs.getString("change_reason"));
+
+        Timestamp createdAt = rs.getTimestamp("created_at");
+        history.setCreatedAt(createdAt == null ? null : createdAt.toInstant());
+        return history;
+    }
+
+    private SalesUploadHistory mapSalesUploadHistory(ResultSet rs, int rowNum) throws SQLException {
+        SalesUploadHistory history = new SalesUploadHistory();
+        history.setId(rs.getLong("id"));
+        history.setFileName(rs.getString("file_name"));
+        history.setUploadedBy(rs.getString("uploaded_by"));
+        history.setUploadedByName(rs.getString("uploaded_by_name"));
+        history.setTotalRows(rs.getInt("total_rows"));
+        history.setAppliedRows(rs.getInt("applied_rows"));
+        history.setWarningRows(rs.getInt("warning_rows"));
+        history.setStatus(rs.getString("status"));
 
         Timestamp createdAt = rs.getTimestamp("created_at");
         history.setCreatedAt(createdAt == null ? null : createdAt.toInstant());

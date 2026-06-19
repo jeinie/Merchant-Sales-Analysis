@@ -219,6 +219,10 @@ export const api = {
     });
   },
 
+  async getSalesUploadHistories() {
+    return request('/admin/sales-upload/histories');
+  },
+
   async updateMerchantLocation(merchantId, payload) {
     return request(`/admin/merchants/${encodeURIComponent(merchantId)}/location`, {
       method: 'POST',

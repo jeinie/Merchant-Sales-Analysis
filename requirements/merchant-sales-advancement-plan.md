@@ -319,9 +319,11 @@ CREATE TABLE action_items (
 현재 구현 상태:
 
 - `POST /api/admin/sales-upload/preview`로 CSV 업로드 전 미리보기 검증을 수행한다.
+- `POST /api/admin/sales-upload/commit`으로 오류가 없는 CSV를 `monthly_sales`에 반영한다.
+- `GET /api/admin/sales-upload/histories`로 최근 매출 데이터 반영 이력을 확인한다.
 - 관리자 페이지의 `데이터 업로드` 탭에서 CSV 파일을 선택하고 행별 오류/경고를 확인할 수 있다.
 - 필수 헤더, 존재하지 않는 가맹점, 동일 파일 내 중복, 기존 월 데이터, 음수값, 객단가 불일치, 전월 대비 50% 이상 변동을 검증한다.
-- 아직 DB 반영(`commit`)과 업로드 이력 저장은 다음 단계로 남겨둔다.
+- CSV 반영은 가맹점/매출월 기준으로 upsert하며, 반영 이력에 파일명, 업로드 사용자, 행 수, 경고 수, 반영 시각을 남긴다.
 
 완료 기준:
 - 관리자는 월별 매출 CSV를 업로드하기 전에 오류/경고를 확인할 수 있다.

@@ -5,6 +5,7 @@ import com.example.merchant.domain.AiInsightHistory;
 import com.example.merchant.domain.Merchant;
 import com.example.merchant.domain.MerchantAlert;
 import com.example.merchant.domain.MonthlySales;
+import com.example.merchant.domain.SalesUploadHistory;
 import com.example.merchant.domain.User;
 import com.example.merchant.service.AiInsightGenerationService;
 import com.example.merchant.service.MerchantDataStore;
@@ -123,6 +124,7 @@ public class MerchantController {
     }
 
     @PostMapping("/admin/sales-upload/commit")
+    @SuppressWarnings("unchecked")
     public ResponseEntity<?> commitSalesUpload(
             HttpServletRequest request,
             @RequestParam("file") MultipartFile file) {
@@ -150,16 +152,34 @@ public class MerchantController {
                     .map(this::monthlySalesFromPreviewRow)
                     .toList();
             int affectedRows = dataStore.upsertMonthlySales(salesRows);
+            Map<String, Object> summary = (Map<String, Object>) preview.get("summary");
+            SalesUploadHistory history = dataStore.recordSalesUploadHistory(
+                    safeFileName(file.getOriginalFilename()),
+                    currentUser(request).getId(),
+                    summaryInt(summary, "totalRows"),
+                    salesRows.size(),
+                    summaryInt(summary, "warningRows"),
+                    "COMMITTED");
             return ResponseEntity.ok(Map.of(
                     "message", "매출 데이터가 반영되었습니다.",
                     "affectedRows", affectedRows,
-                    "summary", preview.get("summary")));
+                    "summary", summary,
+                    "history", history));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "CSV 파일을 반영하는 중 오류가 발생했습니다."));
         }
+    }
+
+    @GetMapping("/admin/sales-upload/histories")
+    public ResponseEntity<?> getSalesUploadHistories(HttpServletRequest request) {
+        if (!isAdmin(request)) {
+            return forbidden();
+        }
+
+        return ResponseEntity.ok(dataStore.getSalesUploadHistories());
     }
 
     @GetMapping("/merchants/{merchantId}/ai-insights")
@@ -857,6 +877,20 @@ public class MerchantController {
         }
 
         return value.length() > maxLength ? value.substring(0, maxLength) : value;
+    }
+
+    private String safeFileName(String fileName) {
+        String value = fileName == null || fileName.isBlank() ? "sales-upload.csv" : fileName.replace("\\", "/");
+        int slashIndex = value.lastIndexOf('/');
+        if (slashIndex >= 0) {
+            value = value.substring(slashIndex + 1);
+        }
+        return truncate(value, 255);
+    }
+
+    private int summaryInt(Map<String, Object> summary, String key) {
+        Object value = summary.get(key);
+        return value instanceof Number number ? number.intValue() : 0;
     }
 
     private ResponseEntity<?> forbidden() {
